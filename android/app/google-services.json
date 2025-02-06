@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "584858366771",
+    "project_id": "myloresnbeauty",
+    "storage_bucket": "myloresnbeauty.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:584858366771:android:a7048750f0c45ac98bc446",
+        "android_client_info": {
+          "package_name": "com.example.lorensbeauty"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "584858366771-sdj4f0shfri1bo384p8e8rg9bialtra5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lorensbeauty",
+            "certificate_hash": "6199909c372c9a944df285d94a4cdd3408461d84"
+          }
+        },
+        {
+          "client_id": "584858366771-b48rilig9dmnvu6qtpj26ti1hpbisjrk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJAAWdeWR7UsBNhyLiRxxW56rc0sMJ65o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "584858366771-b48rilig9dmnvu6qtpj26ti1hpbisjrk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
