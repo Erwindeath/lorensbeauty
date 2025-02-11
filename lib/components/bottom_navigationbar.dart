@@ -15,7 +15,7 @@ class BottomNavigationComponent extends StatefulWidget {
 class _BottomNavigationComponentState extends State<BottomNavigationComponent> {
   List<Widget> screens = [
     const HomeScreen(),
-    const MapsPage(),
+    //const MapsPage(),
     const BookingScreen(),
     const ProfileScreen()
   ];
@@ -46,14 +46,14 @@ class _BottomNavigationComponentState extends State<BottomNavigationComponent> {
                   Icons.location_on_outlined,
                   color: Color(0xff721c80),
                 ),
-                label: 'Visit',
+                label: 'Products',
                 backgroundColor: Colors.white),
             BottomNavigationBarItem(
                 icon: Icon(
                   Icons.edit_calendar_outlined,
                   color: Color(0xff721c80),
                 ),
-                label: 'Book',
+                label: 'Agendar',
                 backgroundColor: Colors.white),
             BottomNavigationBarItem(
                 icon: Icon(

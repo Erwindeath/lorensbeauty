@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../controller/auth_controller.dart';
 
 class OnBoardingScreen extends StatefulWidget {
-
   const OnBoardingScreen({Key? key}) : super(key: key);
   @override
   State<OnBoardingScreen> createState() => _OnBoardingScreenState();

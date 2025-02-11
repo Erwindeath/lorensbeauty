@@ -28,9 +28,9 @@ class Carousel extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Column(
+              const Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
-                children: const [
+                children:  [
                   Spacer(
                     flex: 2,
                   ),
@@ -91,9 +91,9 @@ class Carousel extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Column(
+              const Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
-                children: const [
+                children: [
                   Spacer(
                     flex: 2,
                   ),
