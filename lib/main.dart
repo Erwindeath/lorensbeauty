@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Salon app',
+        title: "Loren's Beauty",
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),

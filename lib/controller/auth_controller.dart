@@ -14,17 +14,16 @@ class Authentication {
       try {
         final UserCredential userCredential =
             await auth.signInWithPopup(authProvider);
-        print(userCredential.user);
+
         user = userCredential.user;
       } catch (e) {
         print(e);
       }
     } else {
-      print("****************AQUI************************");
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ["profile", "email"],
       );
-      try {
+      /* try {
         final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
         if (googleUser != null) {
           print("Nombre: ${googleUser.displayName}");
@@ -34,11 +33,9 @@ class Authentication {
         }
       } catch (e) {
         print("Error durante el inicio de sesión: $e");
-      }
+      }*/
       final GoogleSignInAccount? googleSignInAccount =
           await googleSignIn.signIn();
-      print("asdasdasdasd");
-      print(googleSignInAccount);
       if (googleSignInAccount != null) {
         final GoogleSignInAuthentication googleSignInAuthentication =
             await googleSignInAccount.authentication;
@@ -49,7 +46,6 @@ class Authentication {
         );
 
         try {
-          print("LLEGANDO AQUIASDASDASDASD");
           final UserCredential userCredential =
               await auth.signInWithCredential(credential);
 

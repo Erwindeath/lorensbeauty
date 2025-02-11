@@ -125,7 +125,7 @@ class HomeScreen extends StatelessWidget {
                   const Row(
                     children: [
                       Text(
-                        "Best Specialists",
+                        "Especialistas",
                         style: TextStyle(
                             color: Color(0xff721c80),
                             //letterSpacing: 1.07,
@@ -136,7 +136,7 @@ class HomeScreen extends StatelessWidget {
                         flex: 8,
                       ),
                       Text(
-                        "View all",
+                        "Ver todo",
                         style: TextStyle(
                           color: Colors.grey,
                         ),
@@ -251,7 +251,7 @@ class HomeScreen extends StatelessWidget {
                         height: 10,
                       ),
                       Text(
-                        'Offers',
+                        'Ofertas',
                         style: TextStyle(color: Colors.grey),
                       )
                     ],
@@ -267,7 +267,7 @@ class HomeScreen extends StatelessWidget {
                         height: 10,
                       ),
                       Text(
-                        'Call',
+                        'Contacto',
                         style: TextStyle(color: Colors.grey),
                       )
                     ],
@@ -294,7 +294,7 @@ class HorizontalText extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            "Best Services",
+            "Servicios",
             style: TextStyle(
                 color: Color(0xff721c80),
                 //letterSpacing: 1.07,
@@ -303,7 +303,7 @@ class HorizontalText extends StatelessWidget {
           ),
           Spacer(),
           Text(
-            "View all",
+            "Ver todos",
             style: TextStyle(
               color: Colors.grey,
             ),
