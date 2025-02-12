@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:lorensbeauty/screens/booking/booking_screen.dart';
 import 'package:lorensbeauty/screens/home/home_screen.dart';
-import 'package:lorensbeauty/screens/maps/maps_screen.dart';
 import 'package:lorensbeauty/screens/profile/profile_screen.dart';
 
 class BottomNavigationComponent extends StatefulWidget {
- const BottomNavigationComponent({Key? key}) : super(key: key);
-  
+  const BottomNavigationComponent({Key? key}) : super(key: key);
+
   @override
   State<BottomNavigationComponent> createState() =>
       _BottomNavigationComponentState();
@@ -15,6 +14,7 @@ class BottomNavigationComponent extends StatefulWidget {
 class _BottomNavigationComponentState extends State<BottomNavigationComponent> {
   List<Widget> screens = [
     const HomeScreen(),
+    const BookingScreen(),
     //const MapsPage(),
     const BookingScreen(),
     const ProfileScreen()

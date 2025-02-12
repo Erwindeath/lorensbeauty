@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lorensbeauty/controller/auth_controller.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/widgets/horizontal_line.dart';
 import 'package:provider/provider.dart';
-
 
 class ProfileScreen extends StatelessWidget {
   // final User? user;
@@ -41,7 +41,13 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 35,
-                    foregroundImage: NetworkImage(user!.photoURL.toString()),
+                    //foregroundImage: NetworkImage(user!.photoURL.toString()),
+                    foregroundImage: user?.userMetadata?['avatar_url'] != null
+                        ? NetworkImage(user!.userMetadata!['avatar_url'])
+                        : null,
+                    child: user?.userMetadata?['avatar_url'] == null
+                        ? const Icon(Icons.person, size: 35)
+                        : null,
                   ),
                   const SizedBox(
                     width: 20,
@@ -49,13 +55,15 @@ class ProfileScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.displayName.toString(),
+                      Text(user?.userMetadata?['full_name'] ?? "No Name",
+                          //user.displayName.toString(),
                           style: const TextStyle(
                             fontSize: 24,
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
                           )),
-                      Text(user.email.toString(),
+                      Text(user?.email ?? "No Email",
+                          //user.email.toString(),
                           style: TextStyle(
                             color: Colors.grey.withOpacity(0.8),
                             fontWeight: FontWeight.bold,
@@ -92,6 +100,13 @@ class ProfileScreen extends StatelessWidget {
                 header: "Settings",
                 desc: "Notification, password",
               ),
+              ElevatedButton(
+                  onPressed: () async {
+                    await  Authentication.signOut(context: context);
+                    await Provider.of<UserProvider>(context, listen: false)
+                        .fetchUser();
+                  },
+                  child: const Text("Sign Out"))
             ],
           ),
         ),

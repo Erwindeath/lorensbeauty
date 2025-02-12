@@ -1,4 +1,61 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class Authentication {
+  final supabase = Supabase.instance.client;
+
+  static Future<User?> signInWithGoogle({required BuildContext context}) async {
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        signInOption: SignInOption.standard, // Fuerza selector de cuentas
+        forceCodeForRefreshToken: true,
+      );
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        print("El usuario canceló el inicio de sesión.");
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final AuthResponse response =
+          await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
+      );
+      print(response);
+
+      if (response.session != null) {
+        print("Inicio de sesión exitoso con Supabase.");
+        return response.user; // Devuelve el usuario autenticado
+      } else {
+        print("Error al iniciar sesión con Supabase.");
+        return null;
+      }
+    } catch (e) {
+      print("Error en la autenticación con Google: $e");
+      return null;
+    }
+  }
+
+  static Future<void> signOut({required BuildContext context}) async {
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+    Supabase.instance.client.auth.signOut();
+
+    await googleSignIn.signOut();
+    await Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const OnBoardingScreen()),
+    );
+    print("Sesión cerrada exitosamente.");
+  }
+}
+
+/*import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -72,4 +129,4 @@ class Authentication {
       print(e);
     }
   }
-}
+}*/

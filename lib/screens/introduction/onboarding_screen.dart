@@ -145,7 +145,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                 Authentication.signInWithGoogle(context: context)
                     .then(((value) {
                   if (value != null) {
-                    userProvider.setUser(value);
+                    userProvider.fetchUser();
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(

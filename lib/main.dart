@@ -2,10 +2,28 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/introduction/spalsh_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 
+const supabaseUrl = 'https://cxicibtkgzegooknaoab.supabase.co';
+const supabaseKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4aWNpYnRrZ3plZ29va25hb2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyODc4ODYsImV4cCI6MjA1NDg2Mzg4Nn0.F0TXx-dFQKpfQhK4j28qrNrkoZ_UVeSFLeJqWCm4ADE';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
+    realtimeClientOptions: const RealtimeClientOptions(
+      logLevel: RealtimeLogLevel.info,
+    ),
+    storageOptions: const StorageClientOptions(
+      retryAttempts: 10,
+    ),
+  );
+
   await Firebase.initializeApp();
   runApp(const MyApp());
 }
