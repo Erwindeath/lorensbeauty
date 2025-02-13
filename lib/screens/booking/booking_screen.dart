@@ -42,15 +42,15 @@ class _BookingScreenState extends State<BookingScreen> {
                     bottomLeft: Radius.circular(30),
                     bottomRight: Radius.circular(30)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.only(top: 38, left: 18, right: 18),
+              child: const Padding(
+                padding: EdgeInsets.only(top: 38, left: 18, right: 18),
                 child: Column(
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         Spacer(),
                         Text(
-                          "Book Your Appointment",
+                          "Reserva tu cita",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -60,7 +60,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         Spacer(),
                       ],
                     ),
-                    const CustomDatePicker(),
+                    CustomDatePicker(),
                   ],
                 ),
               ),
@@ -71,7 +71,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Available Slots",
+                    "Horarios disponibles",
                     style: TextStyle(
                         color: Color.fromARGB(255, 45, 42, 42),
                         fontSize: 20,

@@ -43,7 +43,8 @@ class _CustomDatePickerState extends State<CustomDatePicker> {
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          
+          padding: const EdgeInsets.symmetric(vertical: 15),
           child: DatePicker(
             DateTime.now(),
             // monthTextStyle: TextStyle(color: Colors.white),
@@ -63,6 +64,7 @@ class _CustomDatePickerState extends State<CustomDatePicker> {
                 newdate = date;
               });
             },
+            height:MediaQuery.of(context).size.height/10,
           ),
         ),
       ],

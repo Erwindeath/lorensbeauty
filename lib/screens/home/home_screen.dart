@@ -1,7 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../components/carousel.dart';
 
@@ -37,8 +36,7 @@ class HomeScreen extends StatelessWidget {
                           bottomRight: Radius.circular(0)),
                     ),
                     child: const Padding(
-                      padding:
-                          EdgeInsets.only(top: 38, left: 18, right: 18),
+                      padding: EdgeInsets.only(top: 38, left: 18, right: 18),
                       child: Column(
                         children: [
                           Row(
@@ -85,27 +83,28 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const HorizontalText(),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('services')
-                        .snapshots(),
-                    builder: (BuildContext context,
-                        AsyncSnapshot<QuerySnapshot> snapshot) {
+                  StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: Supabase.instance.client
+                        .from('services')
+                        .stream(primaryKey: ['id']),
+                    builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator(
-                          color: Colors.white,
-                        );
+                            color: Colors.white);
                       }
 
+                      if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      }
+                      final services = snapshot.data ?? [];
                       if (snapshot.connectionState == ConnectionState.active) {
                         return SizedBox(
                           height: 100,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: snapshot.data!.size,
+                            itemCount: services.length,
                             itemBuilder: (BuildContext context, int index) {
-                              return CategoryCard(
-                                  e: snapshot.data!.docs[index]);
+                              return CategoryCard(service: services[index]);
                             },
                           ),
                         );
@@ -125,7 +124,7 @@ class HomeScreen extends StatelessWidget {
                   const Row(
                     children: [
                       Text(
-                        "Especialistas",
+                        "Productos",
                         style: TextStyle(
                             color: Color(0xff721c80),
                             //letterSpacing: 1.07,
@@ -136,7 +135,7 @@ class HomeScreen extends StatelessWidget {
                         flex: 8,
                       ),
                       Text(
-                        "Ver todo",
+                        "Ver todos",
                         style: TextStyle(
                           color: Colors.grey,
                         ),
@@ -154,7 +153,7 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(
                     height: 18,
                   ),
-                  StreamBuilder<QuerySnapshot>(
+                  /* StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('workers')
                         .snapshots(),
@@ -190,7 +189,8 @@ class HomeScreen extends StatelessWidget {
                                       height: 22,
                                       child: Text(
                                         snapshot.data?.docs[index]["name"],
-                                        style: const TextStyle(color: Colors.white),
+                                        style: const TextStyle(
+                                            color: Colors.white),
                                         textAlign: TextAlign.center,
                                       ),
                                     )),
@@ -202,7 +202,7 @@ class HomeScreen extends StatelessWidget {
 
                       return Container();
                     },
-                  ),
+                  ),*/
                 ],
               ),
             ),
@@ -219,8 +219,8 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.only(
-                  top: 12, right: 18, left: 18, bottom: 20),
+              padding:
+                  EdgeInsets.only(top: 12, right: 18, left: 18, bottom: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -235,7 +235,7 @@ class HomeScreen extends StatelessWidget {
                         height: 10,
                       ),
                       Text(
-                        'website',
+                        'Sitio web',
                         style: TextStyle(color: Colors.grey),
                       )
                     ],
@@ -320,10 +320,10 @@ class HorizontalText extends StatelessWidget {
 }
 
 class CategoryCard extends StatelessWidget {
-  final QueryDocumentSnapshot<Object?> e;
+  final Map<String, dynamic> service;
   const CategoryCard({
     Key? key,
-    required this.e,
+    required this.service,
   }) : super(key: key);
 
   @override
@@ -352,10 +352,10 @@ class CategoryCard extends StatelessWidget {
                   )
                 ],
                 image: DecorationImage(
-                    image: NetworkImage(e["img"]), fit: BoxFit.cover)),
+                    image: NetworkImage(service['img']), fit: BoxFit.cover)),
           ),
           Text(
-            e["name"],
+            service['name'],
             style: const TextStyle(color: Colors.deepPurple),
           ),
         ],

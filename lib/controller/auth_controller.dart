@@ -43,9 +43,9 @@ class Authentication {
   }
 
   static Future<void> signOut({required BuildContext context}) async {
-        final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignIn googleSignIn = GoogleSignIn();
     Supabase.instance.client.auth.signOut();
-
+    
     await googleSignIn.signOut();
     await Navigator.pushReplacement(
       context,

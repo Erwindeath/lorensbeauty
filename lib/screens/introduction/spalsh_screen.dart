@@ -58,7 +58,9 @@ class _SplashScreenState extends State<SplashScreen> {
       print(AuthChangeEvent.signedIn);
       if (event == AuthChangeEvent.initialSession ||
           event == AuthChangeEvent.signedIn) {
-        await Provider.of<UserProvider>(context, listen: false).fetchUser();
+        if (mounted) {
+          await Provider.of<UserProvider>(context, listen: false).fetchUser();
+        }
       }
       if (event == AuthChangeEvent.initialSession) {
         // Manejar estado inicial
