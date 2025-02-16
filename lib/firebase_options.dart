@@ -59,4 +59,5 @@ class DefaultFirebaseOptions {
     projectId: 'myloresnbeauty',
     storageBucket: 'myloresnbeauty.firebasestorage.app',
   );
+
 }

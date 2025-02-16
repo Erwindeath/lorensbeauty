@@ -13,12 +13,15 @@ class Authentication {
         signInOption: SignInOption.standard, // Fuerza selector de cuentas
         forceCodeForRefreshToken: true,
       );
+      print("*********************************************");
+      print(googleSignIn);
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         print("El usuario canceló el inicio de sesión.");
         return null;
       }
-
+      print("asdjaosdjuklasjkdakjsldjklaskjdlaskjld");
+      print(googleUser);
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
@@ -45,7 +48,7 @@ class Authentication {
   static Future<void> signOut({required BuildContext context}) async {
     final GoogleSignIn googleSignIn = GoogleSignIn();
     Supabase.instance.client.auth.signOut();
-    
+
     await googleSignIn.signOut();
     await Navigator.pushReplacement(
       context,
