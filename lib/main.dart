@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/introduction/spalsh_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +14,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseKey,
+    postgrestOptions: const PostgrestClientOptions(
+      schema: 'public',
+    ),
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
@@ -40,11 +44,28 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: "Loren's Beauty",
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
+        theme: _buildCustomTheme(),
         home: const SplashScreen(),
       ),
     );
+  }
+
+  ThemeData _buildCustomTheme() {
+    const Color primaryColor = Color(0xff721c80);
+    const Color scaffoldBackground = Colors.white;
+
+    return ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: primaryColor,
+          primary: primaryColor,
+          secondary: Colors.grey[300]!,
+        ),
+        scaffoldBackgroundColor: scaffoldBackground,
+        appBarTheme: const AppBarTheme(
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          iconTheme: IconThemeData(color: Colors.white),
+        ));
   }
 }

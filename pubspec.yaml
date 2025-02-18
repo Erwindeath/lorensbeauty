@@ -44,6 +44,7 @@ dependencies:
   date_picker_timeline: ^1.2.6
   provider: ^6.1.2
   supabase_flutter: ^2.8.3
+  babstrap_settings_screen: ^0.1.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

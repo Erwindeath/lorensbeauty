@@ -117,7 +117,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             //  HorizontalText()
-            Padding(
+            const Padding(
               padding: const EdgeInsets.only(left: 18, top: 16),
               child: Column(
                 children: [

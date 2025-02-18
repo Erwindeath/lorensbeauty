@@ -17,7 +17,7 @@ class _BottomNavigationComponentState extends State<BottomNavigationComponent> {
     const BookingScreen(),
     //const MapsPage(),
     const BookingScreen(),
-    const ProfileScreen()
+    const ProfileScreen(role: 2,)
   ];
 
   int _selectedIndex = 0;

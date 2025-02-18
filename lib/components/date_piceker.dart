@@ -43,7 +43,6 @@ class _CustomDatePickerState extends State<CustomDatePicker> {
           ),
         ),
         Container(
-          
           padding: const EdgeInsets.symmetric(vertical: 15),
           child: DatePicker(
             DateTime.now(),
@@ -64,7 +63,7 @@ class _CustomDatePickerState extends State<CustomDatePicker> {
                 newdate = date;
               });
             },
-            height:MediaQuery.of(context).size.height/10,
+            height: MediaQuery.of(context).size.height / 10,
           ),
         ),
       ],
