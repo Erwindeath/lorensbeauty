@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "584858366771-co44kvsa2goupgvbd52um728o8d0m1rt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lorensbeauty",
+            "certificate_hash": "d3fea68390a5599f464f83ba7c2d633889e4e64a"
+          }
+        },
+        {
+          "client_id": "584858366771-o7t57l6mfle52c0v144mqp50ptuprp9j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lorensbeauty",
+            "certificate_hash": "fe8bcab9582d041e02289ce6fe5ccc6a4452048a"
+          }
+        },
+        {
           "client_id": "584858366771-sdj4f0shfri1bo384p8e8rg9bialtra5.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
