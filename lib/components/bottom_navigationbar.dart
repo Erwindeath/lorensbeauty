@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lorensbeauty/screens/booking/booking_screen.dart';
 import 'package:lorensbeauty/screens/home/home_screen.dart';
+import 'package:lorensbeauty/screens/profile/profile_admin.dart';
 import 'package:lorensbeauty/screens/profile/profile_screen.dart';
 
 class BottomNavigationComponent extends StatefulWidget {
@@ -17,7 +18,7 @@ class _BottomNavigationComponentState extends State<BottomNavigationComponent> {
     const BookingScreen(),
     //const MapsPage(),
     const BookingScreen(),
-    const ProfileScreen()
+    const AccountScreen()
   ];
 
   int _selectedIndex = 0;
