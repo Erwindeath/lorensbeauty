@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:lorensbeauty/components/colors.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/introduction/spalsh_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,7 +44,9 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: "Loren's Beauty",
-        theme: _buildCustomTheme(),
+        theme: ThemeData(
+          primarySwatch: Colores.esquemaColor,
+        ),
         home: const SplashScreen(),
       ),
     );
