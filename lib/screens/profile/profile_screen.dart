@@ -16,6 +16,7 @@ class ProfileScreen extends StatelessWidget {
 
     //print(user);
     return Scaffold(
+      
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 40),
         child: SingleChildScrollView(
