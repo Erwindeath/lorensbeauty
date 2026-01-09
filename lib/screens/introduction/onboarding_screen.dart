@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:lorensbeauty/components/bottom_navigationbar.dart';
+import 'package:lorensbeauty/components/role_based_navigation.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
+import 'package:lorensbeauty/screens/auth/login_screen.dart';
+import 'package:lorensbeauty/screens/auth/register_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../controller/auth_controller.dart';
@@ -127,57 +129,144 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
               ),
             ),
             const Text(
-              "The Professional Specialists",
+              "Loren's Beauty",
               style: TextStyle(
                   color: Colors.black,
-                  fontSize: 24,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold),
             ),
-            const Text(
-              "choose your hairStyle choose your hair\n          style choose your hairStyle",
-              style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                  fontWeight: FontWeight.normal),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                "Reserva tus citas de belleza de forma fácil y rápida",
+                style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 16,
+                    fontWeight: FontWeight.normal),
+                textAlign: TextAlign.center,
+              ),
             ),
-            GestureDetector(
-              onTap: () {
-                Authentication.signInWithGoogle(context: context)
-                    .then(((value) {
-                  if (value != null) {
-                    userProvider.fetchUser();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (ctx) => const BottomNavigationComponent()),
-                    );
-                  }
-                }));
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 30),
-                height: 50,
-                width: 220,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: const Color(0xff721c80),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xff721c80),
-                      Color.fromARGB(255, 196, 103, 169),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Column(
+                children: [
+                  // Botón de Iniciar Sesión con Email
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      height: 50,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xff721c80),
+                            Color.fromARGB(255, 196, 103, 169),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          "Iniciar Sesión",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                child: const Center(
-                    child: Text(
-                  "Get Started",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                )),
+                  const SizedBox(height: 12),
+
+                  // Botón de Registrarse
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RegisterScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      height: 50,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xff721c80), width: 2),
+                        color: Colors.white,
+                      ),
+                      child: const Center(
+                        child: Text(
+                          "Registrarse",
+                          style: TextStyle(
+                              color: Color(0xff721c80),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Botón de Google
+                  GestureDetector(
+                    onTap: () {
+                      Authentication.signInWithGoogle(context: context)
+                          .then(((value) {
+                        if (value != null) {
+                          userProvider.fetchUser();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (ctx) => const RoleBasedNavigation()),
+                          );
+                        }
+                      }));
+                    },
+                    child: Container(
+                      height: 50,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/google_logo.png',
+                            height: 24,
+                            width: 24,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback si no hay imagen local
+                              return const Icon(Icons.account_circle, size: 24, color: Colors.grey);
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            "Continuar con Google",
+                            style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                ],
               ),
             )
           ],

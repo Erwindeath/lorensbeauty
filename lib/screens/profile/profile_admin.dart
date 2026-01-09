@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:lorensbeauty/components/colors.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/profile/settings.admin.dart';
+import 'package:lorensbeauty/screens/introduction/spalsh_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({Key? key}) : super(key: key);
@@ -48,7 +49,6 @@ class AccountScreen extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 35,
-                              //foregroundImage: NetworkImage(user!.photoURL.toString()),
                               foregroundImage:
                                   user?.userMetadata?['avatar_url'] != null
                                       ? NetworkImage(
@@ -64,15 +64,13 @@ class AccountScreen extends StatelessWidget {
                               children: [
                                 Text(
                                     user?.userMetadata?['full_name'] ??
-                                        "No Name",
-                                    //user.displayName.toString(),
+                                        "Administrador",
                                     style: const TextStyle(
                                       fontSize: 20,
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     )),
                                 Text(user?.email ?? "No Email",
-                                    //user.email.toString(),
                                     style: TextStyle(
                                       color: Colors.grey.withOpacity(0.8),
                                       fontWeight: FontWeight.bold,
@@ -80,16 +78,6 @@ class AccountScreen extends StatelessWidget {
                               ],
                             ),
                             const Spacer(),
-                            /* ForwardButton(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const EditAccountScreen(),
-                                        ),
-                                      );
-                                    },
-                                  )*/
                           ],
                         ),
                       ),
@@ -104,22 +92,24 @@ class AccountScreen extends StatelessWidget {
           child: SingleChildScrollView(
             child: ListView.separated(
               shrinkWrap: true,
-              physics:
-                  const NeverScrollableScrollPhysics(), // Para evitar conflictos con el ScrollView padre
-              itemCount: settings.length,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: getSettings(context).length,
               separatorBuilder: (context, index) =>
-                  const SizedBox(height: 1), // Espaciado entre elementos
+                  const SizedBox(height: 1),
               itemBuilder: (context, index) {
-                final setting = settings[index];
+                final setting = getSettings(context)[index];
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: SettingItem(
-                    title: setting['title'],
-                    icon: setting['icon'],
-                    bgColor: setting['bgColor'],
-                    iconColor: setting['iconColor'],
-                    value: setting['value'],
+                  child: InkWell(
                     onTap: setting['onTap'],
+                    child: SettingItem(
+                      title: setting['title'],
+                      icon: setting['icon'],
+                      bgColor: setting['bgColor'],
+                      iconColor: setting['iconColor'],
+                      value: setting['value'],
+                      onTap: setting['onTap'],
+                    ),
                   ),
                 );
               },
@@ -131,90 +121,120 @@ class AccountScreen extends StatelessWidget {
   }
 }
 
-final List<Map<String, dynamic>> settings = [
-  {
-    "title": "Language",
-    "icon": Icons.wordpress,
-    "bgColor": Colors.orange.shade100,
-    "iconColor": Colors.orange,
-    "value": "English",
-    "onTap": () {},
-  },
-  {
-    "title": "Notifications",
-    "icon": Icons.notifications,
-    "bgColor": Colors.blue.shade100,
-    "iconColor": Colors.blue,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-  {
-    "title": "Help",
-    "icon": Icons.help,
-    "bgColor": Colors.red.shade100,
-    "iconColor": Colors.red,
-    "onTap": () {},
-  },
-];
+List<Map<String, dynamic>> getSettings(BuildContext context) => [
+      {
+        "title": "Notificaciones",
+        "icon": Icons.notifications,
+        "bgColor": Colors.blue.shade100,
+        "iconColor": Colors.blue,
+        "value": null,
+        "onTap": () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Próximamente')),
+          );
+        },
+      },
+      {
+        "title": "Privacidad",
+        "icon": Icons.privacy_tip,
+        "bgColor": Colors.green.shade100,
+        "iconColor": Colors.green,
+        "value": null,
+        "onTap": () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Próximamente')),
+          );
+        },
+      },
+      {
+        "title": "Ayuda y Soporte",
+        "icon": Icons.help_outline,
+        "bgColor": Colors.orange.shade100,
+        "iconColor": Colors.orange,
+        "value": null,
+        "onTap": () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Contacta a soporte@lorensbeauty.com')),
+          );
+        },
+      },
+      {
+        "title": "Acerca de",
+        "icon": Icons.info_outline,
+        "bgColor": Colors.purple.shade100,
+        "iconColor": Colors.purple,
+        "value": null,
+        "onTap": () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Loren\'s Beauty'),
+              content: const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sistema de Gestión de Salón de Belleza'),
+                  SizedBox(height: 8),
+                  Text('Versión: 1.0.0'),
+                  SizedBox(height: 8),
+                  Text('© 2024 Loren\'s Beauty'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cerrar'),
+                ),
+              ],
+            ),
+          );
+        },
+      },
+      {
+        "title": "Cerrar Sesión",
+        "icon": Icons.logout,
+        "bgColor": Colors.red.shade100,
+        "iconColor": Colors.red,
+        "value": null,
+        "onTap": () async {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Cerrar Sesión'),
+              content:
+                  const Text('¿Estás seguro de que quieres cerrar sesión?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await Supabase.instance.client.auth.signOut();
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (context) => const SplashScreen()),
+                          (route) => false,
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error al cerrar sesión: $e')),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Cerrar Sesión'),
+                ),
+              ],
+            ),
+          );
+        },
+      },
+    ];

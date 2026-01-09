@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lorensbeauty/controller/auth_controller.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/material.dart';
 
 class CardAdmin extends StatelessWidget {
   final Color? backgroundColor;
@@ -14,7 +13,7 @@ class CardAdmin extends StatelessWidget {
   final Widget? userMoreInfo;
   final ImageProvider userProfilePic;
 
-  CardAdmin({
+  const CardAdmin({Key? key, 
     this.backgroundColor,
     this.settingColor,
     this.cardRadius = 30,
@@ -23,7 +22,7 @@ class CardAdmin extends StatelessWidget {
     this.cardActionWidget,
     this.userMoreInfo,
     required this.userProfilePic,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
