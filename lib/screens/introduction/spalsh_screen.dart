@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:lorensbeauty/components/bottom_navigationbar.dart';
+import 'package:lorensbeauty/components/role_based_navigation.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
 import 'package:provider/provider.dart';
@@ -66,14 +66,14 @@ class _SplashScreenState extends State<SplashScreen> {
         // Manejar estado inicial
         if (session != null) {
           print("✅ Usuario autenticado (inicial)");
-          navigateTo(const BottomNavigationComponent());
+          navigateTo(const RoleBasedNavigation());
         } else {
           print("❌ No hay usuario autenticado (inicial)");
           navigateTo(const OnBoardingScreen());
         }
       } else if (event == AuthChangeEvent.signedIn && session != null) {
         print("✅ Usuario autenticado");
-        navigateTo(const BottomNavigationComponent());
+        navigateTo(const RoleBasedNavigation());
       } else {
         print("❌ No hay usuario autenticado");
         navigateTo(const OnBoardingScreen());

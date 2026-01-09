@@ -1,20 +1,28 @@
 import 'package:date_picker_timeline/date_picker_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CustomDatePicker extends StatefulWidget {
+// Provider para la fecha seleccionada en el booking
+final selectedBookingDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
+class CustomDatePicker extends ConsumerStatefulWidget {
   const CustomDatePicker({
     Key? key,
   }) : super(key: key);
 
   @override
-  State<CustomDatePicker> createState() => _CustomDatePickerState();
+  ConsumerState<CustomDatePicker> createState() => _CustomDatePickerState();
 }
 
-class _CustomDatePickerState extends State<CustomDatePicker> {
+class _CustomDatePickerState extends ConsumerState<CustomDatePicker> {
   DateTime newdate = DateTime.now();
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final datePickerHeight = screenHeight > 700 ? 90.0 : 80.0;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 20),
@@ -23,48 +31,56 @@ class _CustomDatePickerState extends State<CustomDatePicker> {
               const Icon(
                 Icons.arrow_back_ios,
                 color: Colors.white60,
-                size: 20,
+                size: 18,
               ),
               const Spacer(),
               Text(
                 "${setMonth(newdate.month)}, ${newdate.year}",
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w400),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500),
               ),
               const Spacer(),
               const Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.white60,
-                size: 20,
+                size: 18,
               ),
             ],
           ),
         ),
         Container(
-          
-          padding: const EdgeInsets.symmetric(vertical: 15),
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
           child: DatePicker(
             DateTime.now(),
-            // monthTextStyle: TextStyle(color: Colors.white),
-            //    dateTextStyle: TextStyle(
-            // color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            // dayTextStyle: TextStyle(color: Colors.white),
+            daysCount: 30,
             deactivatedColor: Colors.white,
             initialSelectedDate: DateTime.now(),
             selectionColor: Colors.white,
             selectedTextColor: const Color(0xff721c80),
+            dateTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+            dayTextStyle: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+            monthTextStyle: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+            ),
             onDateChange: (date) {
               setState(() {
-                print(date.day);
-                print(date.month);
-
-                /// String updateDate = date.toString();
                 newdate = date;
               });
+              // Actualizar el provider
+              ref.read(selectedBookingDateProvider.notifier).state = date;
             },
-            height:MediaQuery.of(context).size.height/10,
+            height: datePickerHeight,
+            width: 58,
           ),
         ),
       ],
