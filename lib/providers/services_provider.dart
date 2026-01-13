@@ -13,7 +13,7 @@ class ServiceCategory {
   final String colorHex;
   final int displayOrder;
   final bool isActive;
-  final int serviceCount; 
+  final int servicesCount;
   ServiceCategory({
     required this.id,
     required this.name,
@@ -22,7 +22,7 @@ class ServiceCategory {
     this.colorHex = '#721c80',
     this.displayOrder = 0,
     this.isActive = true,
-    this.serviceCount = 0,
+    this.servicesCount = 0,
   });
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) {
@@ -34,7 +34,7 @@ class ServiceCategory {
       colorHex: json['color_hex'] as String? ?? '#721c80',
       displayOrder: json['display_order'] as int? ?? 0,
       isActive: json['is_active'] as bool? ?? true,
-      serviceCount: json['services_count'] as int? ?? 0,
+      servicesCount: json['services_count'] as int? ?? 0,
     );
   }
 
@@ -51,6 +51,32 @@ class ServiceCategory {
   }
 }
 
+class ServicePhoto {
+  final int id;
+  final int serviceId;
+  final String photoUrl;
+  final String? caption;
+  final DateTime uploadedAt;
+
+  ServicePhoto({
+    required this.id,
+    required this.serviceId,
+    required this.photoUrl,
+    this.caption,
+    required this.uploadedAt,
+  });
+
+  factory ServicePhoto.fromJson(Map<String, dynamic> json) {
+    return ServicePhoto(
+      id: json['id'] as int,
+      serviceId: json['service_id'] as int,
+      photoUrl: json['photo_url'] as String,
+      caption: json['caption'] as String?,
+      uploadedAt: DateTime.parse(json['uploaded_at'] as String),
+    );
+  }
+}
+
 class Service {
   final int id;
   final int? categoryId;
@@ -60,6 +86,8 @@ class Service {
   final int durationMinutes;
   final String? img;
   final bool isActive;
+  final String? categoryName;
+  final List<ServicePhoto> photos;
 
   Service({
     required this.id,
@@ -70,9 +98,18 @@ class Service {
     required this.durationMinutes,
     this.img,
     this.isActive = true,
+    this.categoryName,
+    this.photos = const [],
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
+    List<ServicePhoto> photosList = [];
+    if (json['photos'] != null) {
+      photosList = (json['photos'] as List)
+          .map((photoJson) => ServicePhoto.fromJson(photoJson))
+          .toList();
+    }
+
     return Service(
       id: json['id'] as int,
       categoryId: json['category_id'] as int?,
@@ -82,6 +119,8 @@ class Service {
       durationMinutes: json['duration_minutes'] as int? ?? 30,
       img: json['img'] as String?,
       isActive: json['is_active'] as bool? ?? true,
+      categoryName: json['category_name'] as String?,
+      photos: photosList,
     );
   }
 
@@ -113,6 +152,10 @@ class Service {
     }
     return '$hours h ${minutes}min';
   }
+
+  // Helpers para fotos
+  bool get hasPhotos => photos.isNotEmpty;
+  String get firstPhotoUrl => hasPhotos ? photos.first.photoUrl : '';
 }
 
 // ============================================
@@ -249,4 +292,152 @@ bool isServiceSelected(WidgetRef ref, Service service) {
 void clearSelectedServices(WidgetRef ref) {
   ref.read(selectedServicesProvider.notifier).state = [];
   ref.read(selectedCategoryProvider.notifier).state = null;
+}
+
+/// Provider para obtener un servicio específico por ID (con fotos)
+final serviceByIdProvider = FutureProvider.family<Service?, int>((ref, serviceId) async {
+  try {
+    final response = await Supabase.instance.client
+        .from('services')
+        .select('''
+          *,
+          service_categories(name)
+        ''')
+        .eq('id', serviceId)
+        .single();
+
+    // Obtener fotos del servicio
+    final photos = await Supabase.instance.client
+        .from('services_photos')
+        .select()
+        .eq('service_id', serviceId)
+        .order('uploaded_at');
+
+    // Agregar nombre de categoría si existe
+    if (response['service_categories'] != null) {
+      response['category_name'] = response['service_categories']['name'];
+    }
+    response['photos'] = photos;
+
+    return Service.fromJson(response);
+  } catch (e) {
+    print('Error fetching service by ID: $e');
+    return null;
+  }
+});
+
+// ============================================
+// MÉTODOS CRUD
+// ============================================
+
+/// Crear un nuevo servicio
+Future<Service?> createService({
+  required String name,
+  required double price,
+  required int durationMinutes,
+  required int categoryId,
+  String? description,
+}) async {
+  try {
+    final response = await Supabase.instance.client
+        .from('services')
+        .insert({
+          'name': name,
+          'price': price,
+          'duration_minutes': durationMinutes,
+          'category_id': categoryId,
+          'description': description,
+          'is_active': true,
+        })
+        .select()
+        .single();
+
+    return Service.fromJson(response);
+  } catch (e) {
+    print('Error creating service: $e');
+    return null;
+  }
+}
+
+/// Actualizar un servicio existente
+Future<bool> updateService({
+  required int serviceId,
+  String? name,
+  double? price,
+  int? durationMinutes,
+  int? categoryId,
+  String? description,
+  bool? isActive,
+}) async {
+  try {
+    final Map<String, dynamic> updates = {};
+
+    if (name != null) updates['name'] = name;
+    if (price != null) updates['price'] = price;
+    if (durationMinutes != null) updates['duration_minutes'] = durationMinutes;
+    if (categoryId != null) updates['category_id'] = categoryId;
+    if (description != null) updates['description'] = description;
+    if (isActive != null) updates['is_active'] = isActive;
+
+    if (updates.isEmpty) return false;
+
+    await Supabase.instance.client
+        .from('services')
+        .update(updates)
+        .eq('id', serviceId);
+
+    return true;
+  } catch (e) {
+    print('Error updating service: $e');
+    return false;
+  }
+}
+
+/// Agregar una foto a un servicio
+Future<bool> addServicePhoto({
+  required int serviceId,
+  required String photoUrl,
+  String? caption,
+}) async {
+  try {
+    await Supabase.instance.client.from('services_photos').insert({
+      'service_id': serviceId,
+      'photo_url': photoUrl,
+      'caption': caption,
+    });
+    return true;
+  } catch (e) {
+    print('Error adding service photo: $e');
+    return false;
+  }
+}
+
+/// Eliminar una foto de un servicio
+Future<bool> deleteServicePhoto(int photoId) async {
+  try {
+    await Supabase.instance.client
+        .from('services_photos')
+        .delete()
+        .eq('id', photoId);
+
+    return true;
+  } catch (e) {
+    print('Error deleting service photo: $e');
+    return false;
+  }
+}
+
+/// Eliminar un servicio
+Future<bool> deleteService(int serviceId) async {
+  try {
+    await Supabase.instance.client
+        .from('services')
+        .delete()
+        .eq('id', serviceId);
+
+    return true;
+  } catch (e) {
+    print('Error deleting service: $e');
+    return false;
+  }
 }

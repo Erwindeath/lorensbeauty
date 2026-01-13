@@ -70,6 +70,7 @@ class _ProductsManagementScreenState
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _navigateToProductForm(null),
         backgroundColor: const Color(0xff721c80),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Nuevo Producto'),
       ),
