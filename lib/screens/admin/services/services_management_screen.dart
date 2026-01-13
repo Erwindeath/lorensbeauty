@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lorensbeauty/providers/services_provider.dart';
-import '../../../providers/products_provider.dart';
-
+import 'service_form_screen.dart';
 
 class ServicesManagementScreen extends ConsumerStatefulWidget {
   const ServicesManagementScreen({Key? key}) : super(key: key);
 
   @override
   ConsumerState<ServicesManagementScreen> createState() =>
-      _ProductsManagementScreenState();
+      _ServicesManagementScreenState();
 }
 
-class _ProductsManagementScreenState
+class _ServicesManagementScreenState
     extends ConsumerState<ServicesManagementScreen> {
   int? _selectedCategoryId;
 
@@ -28,49 +28,69 @@ class _ProductsManagementScreenState
       ),
       body: Column(
         children: [
-          // Filtro por categoría
+          // Filtro de categorías
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[100],
             child: categoriesAsync.when(
               data: (categories) {
-                return DropdownButtonFormField<int?>(
-                  value: _selectedCategoryId,
-                  decoration: const InputDecoration(
-                    labelText: 'Filtrar por categoría',
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Todos'),
+                        checkmarkColor: Colors.white,
+                        selected: _selectedCategoryId == null,
+                        onSelected: (selected) {
+                          setState(() => _selectedCategoryId = null);
+                        },
+                        selectedColor: const Color(0xff721c80),
+                        labelStyle: TextStyle(
+                          color: _selectedCategoryId == null
+                              ? Colors.white
+                              : Colors.black,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ...categories.map((category) {
+                        final isSelected = _selectedCategoryId == category.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text('${category.name} (${category.servicesCount})'),
+                            selected: isSelected,
+                            checkmarkColor: Colors.white,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedCategoryId = selected ? category.id : null;
+                              });
+                            },
+                            selectedColor: const Color(0xff721c80),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Todas las categorías'),
-                    ),
-                    ...categories.map((cat) => DropdownMenuItem(
-                          value: cat.id,
-                          child: Text('${cat.name} (${cat.serviceCount})'),
-                        )),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _selectedCategoryId = value);
-                  },
                 );
               },
-              loading: () => const CircularProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const Text('Error al cargar categorías'),
             ),
           ),
 
-          // Lista de productos
+          // Lista de servicios
           Expanded(
             child: _buildServicesList(),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: (){},//=>_navigateToProductForm(null),
+        onPressed: () => _navigateToServiceForm(null),
         backgroundColor: const Color(0xff721c80),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Nuevo Servicio'),
       ),
@@ -78,77 +98,77 @@ class _ProductsManagementScreenState
   }
 
   Widget _buildServicesList() {
-    if (_selectedCategoryId == null) {
-      // Mostrar todos los productos
-      final productsAsync = ref.watch(allProductsProvider);
+    // Obtener TODOS los servicios una sola vez
+    final servicesAsync = ref.watch(allServicesProvider);
 
-      return productsAsync.when(
-        data: (products) {
-          if (products.isEmpty) {
-            return const Center(
-              child: Text('No hay productos registrados'),
-            );
-          }
+    return servicesAsync.when(
+      data: (allServices) {
+        // Filtrar localmente según la categoría seleccionada
+        final filteredServices = _selectedCategoryId == null
+            ? allServices
+            : allServices
+                .where((service) => service.categoryId == _selectedCategoryId)
+                .toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(products[index]);
-            },
+        if (filteredServices.isEmpty) {
+          return Center(
+            child: Text(
+              _selectedCategoryId == null
+                  ? 'No hay servicios registrados'
+                  : 'No hay servicios en esta categoría',
+            ),
           );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: Color(0xff721c80)),
-        ),
-        error: (error, _) => Center(
-          child: Text('Error: ${error.toString()}'),
-        ),
-      );
-    } else {
-      // Mostrar productos por categoría
-      final productsAsync =
-          ref.watch(productsByCategoryProvider(_selectedCategoryId!));
+        }
 
-      return productsAsync.when(
-        data: (products) {
-          if (products.isEmpty) {
-            return const Center(
-              child: Text('No hay productos en esta categoría'),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(products[index]);
-            },
-          );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: Color(0xff721c80)),
-        ),
-        error: (error, _) => Center(
-          child: Text('Error: ${error.toString()}'),
-        ),
-      );
-    }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: filteredServices.length,
+          addAutomaticKeepAlives: true,
+          cacheExtent: 500,
+          itemBuilder: (context, index) {
+            return _buildServiceCard(filteredServices[index]);
+          },
+        );
+      },
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: Color(0xff721c80)),
+      ),
+      error: (error, _) => Center(
+        child: Text('Error: ${error.toString()}'),
+      ),
+    );
   }
 
-  Widget _buildProductCard(Product product) {
+  Widget _buildServiceCard(Service service) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: product.hasPhotos
+        leading: service.hasPhotos
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  product.firstPhotoUrl,
+                child: CachedNetworkImage(
+                  imageUrl: service.firstPhotoUrl,
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  fadeInDuration: const Duration(milliseconds: 200),
+                  fadeOutDuration: const Duration(milliseconds: 200),
+                  memCacheWidth: 120,
+                  memCacheHeight: 120,
+                  maxWidthDiskCache: 120,
+                  maxHeightDiskCache: 120,
+                  placeholder: (context, url) => Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xff721c80),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
                     width: 60,
                     height: 60,
                     color: Colors.grey[300],
@@ -163,30 +183,31 @@ class _ProductsManagementScreenState
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.shopping_bag),
+                child: const Icon(Icons.spa),
               ),
         title: Row(
           children: [
             Expanded(
               child: Text(
-                product.name,
+                service.name,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            if (product.isFeatured)
-              const Icon(Icons.star, color: Color(0xFFFFD700), size: 20),
-            if (!product.active)
+            if (!service.isActive)
               const Icon(Icons.visibility_off, color: Colors.grey, size: 20),
           ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(product.formattedPrice,
+            Text(service.formattedPrice,
                 style: const TextStyle(
                     color: Color(0xff721c80), fontWeight: FontWeight.bold)),
-            if (product.categoryName != null)
-              Text('Categoría: ${product.categoryName}',
+            Text(service.formattedDuration,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            // Mostrar categoría solo cuando NO hay filtro activo
+            if (_selectedCategoryId == null && service.categoryName != null)
+              Text('Categoría: ${service.categoryName}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           ],
         ),
@@ -218,24 +239,11 @@ class _ProductsManagementScreenState
               child: Row(
                 children: [
                   Icon(
-                    product.active ? Icons.visibility_off : Icons.visibility,
+                    service.isActive ? Icons.visibility_off : Icons.visibility,
                     color: Colors.orange,
                   ),
                   const SizedBox(width: 8),
-                  Text(product.active ? 'Desactivar' : 'Activar'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'toggle_featured',
-              child: Row(
-                children: [
-                  Icon(
-                    product.isFeatured ? Icons.star_border : Icons.star,
-                    color: Color(0xFFFFD700),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(product.isFeatured ? 'Quitar destacado' : 'Destacar'),
+                  Text(service.isActive ? 'Desactivar' : 'Activar'),
                 ],
               ),
             ),
@@ -243,24 +251,17 @@ class _ProductsManagementScreenState
           onSelected: (value) async {
             switch (value) {
               case 'edit':
-                //_navigateToProductForm(product);
+                _navigateToServiceForm(service);
                 break;
               case 'delete':
-                _confirmDelete(product);
+                _confirmDelete(service);
                 break;
               case 'toggle_active':
-                await updateProduct(
-                  productId: product.id,
-                  active: !product.active,
+                await updateService(
+                  serviceId: service.id,
+                  isActive: !service.isActive,
                 );
-                _refreshProducts();
-                break;
-              case 'toggle_featured':
-                await updateProduct(
-                  productId: product.id,
-                  isFeatured: !product.isFeatured,
-                );
-                _refreshProducts();
+                _refreshServices();
                 break;
             }
           },
@@ -269,33 +270,31 @@ class _ProductsManagementScreenState
     );
   }
 
- /* void _navigateToProductForm(Product? product) async {
+  void _navigateToServiceForm(Service? service) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductFormScreen(product: product),
+        builder: (context) => ServiceFormScreen(service: service),
       ),
     );
 
     if (result == true) {
-      _refreshProducts();
-    }
-  }*/
-
-  void _refreshProducts() {
-    ref.invalidate(allProductsProvider);
-    ref.invalidate(featuredProductsProvider);
-    if (_selectedCategoryId != null) {
-      ref.invalidate(productsByCategoryProvider(_selectedCategoryId!));
+      _refreshServices();
     }
   }
 
-  void _confirmDelete(Product product) {
+  void _refreshServices() {
+    // Solo invalidamos allServicesProvider ya que ahora filtramos localmente
+    ref.invalidate(allServicesProvider);
+    ref.invalidate(serviceCategoriesProvider);
+  }
+
+  void _confirmDelete(Service service) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar eliminación'),
-        content: Text('¿Estás seguro de eliminar el producto "${product.name}"?'),
+        content: Text('¿Estás seguro de eliminar el servicio "${service.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -303,16 +302,16 @@ class _ProductsManagementScreenState
           ),
           ElevatedButton(
             onPressed: () async {
-              await deleteProduct(product.id);
+              await deleteService(service.id);
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Producto eliminado'),
+                    content: Text('Servicio eliminado'),
                     backgroundColor: Colors.green,
                   ),
                 );
-                _refreshProducts();
+                _refreshServices();
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
