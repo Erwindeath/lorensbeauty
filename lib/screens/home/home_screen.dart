@@ -64,7 +64,7 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          SearchBar()
+                          SearchBar(leading: Icon(Icons.search),)
                         ],
                       ),
                     ),
@@ -117,11 +117,11 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             //  HorizontalText()
-            Padding(
-              padding: const EdgeInsets.only(left: 18, top: 16),
+            const Padding(
+              padding:  EdgeInsets.only(left: 18, top: 16),
               child: Column(
                 children: [
-                  const Row(
+                   Row(
                     children: [
                       Text(
                         "Productos",
@@ -150,7 +150,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(
+                   SizedBox(
                     height: 18,
                   ),
                   /* StreamBuilder<QuerySnapshot>(

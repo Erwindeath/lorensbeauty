@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lorensbeauty/components/colors.dart';
+import 'package:lorensbeauty/controller/auth_controller.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/profile/settings.admin.dart';
 import 'package:provider/provider.dart';
@@ -20,7 +20,6 @@ class AccountScreen extends StatelessWidget {
             Align(
               alignment: Alignment.topCenter,
               child: Container(
-                height: MediaQuery.of(context).size.height / 5.3,
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -32,67 +31,66 @@ class AccountScreen extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(40),
-                      bottomRight: Radius.circular(40)),
+                    bottomLeft: Radius.circular(40),
+                    bottomRight: Radius.circular(40),
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       vertical: 35.0, horizontal: 10.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
                     children: [
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 35,
-                              //foregroundImage: NetworkImage(user!.photoURL.toString()),
-                              foregroundImage:
-                                  user?.userMetadata?['avatar_url'] != null
-                                      ? NetworkImage(
-                                          user!.userMetadata!['avatar_url'])
-                                      : null,
-                              child: user?.userMetadata?['avatar_url'] == null
-                                  ? const Icon(Icons.person, size: 35)
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      // Contenido superior (avatar e información del usuario)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: Row(
                               children: [
-                                Text(
-                                    user?.userMetadata?['full_name'] ??
-                                        "No Name",
-                                    //user.displayName.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    )),
-                                Text(user?.email ?? "No Email",
-                                    //user.email.toString(),
-                                    style: TextStyle(
-                                      color: Colors.grey.withOpacity(0.8),
-                                      fontWeight: FontWeight.bold,
-                                    )),
+                                CircleAvatar(
+                                  radius: 35,
+                                  foregroundImage:
+                                      user?.userMetadata?['avatar_url'] != null
+                                          ? NetworkImage(
+                                              user!.userMetadata!['avatar_url'])
+                                          : null,
+                                  child:
+                                      user?.userMetadata?['avatar_url'] == null
+                                          ? const Icon(Icons.person, size: 35)
+                                          : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user?.userMetadata?['full_name'] ??
+                                          "No Name",
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      user?.email ?? "No Email",
+                                      style: TextStyle(
+                                        color: Colors.grey.withOpacity(0.8),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
                               ],
                             ),
-                            const Spacer(),
-                            /* ForwardButton(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const EditAccountScreen(),
-                                        ),
-                                      );
-                                    },
-                                  )*/
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                      // Botón de cerrar sesión en la esquina inferior derecha
                     ],
                   ),
                 ),
@@ -124,6 +122,22 @@ class AccountScreen extends StatelessWidget {
                 );
               },
             ),
+          ),
+        ),
+        SizedBox(
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await Authentication.signOut(context: context);
+                    await Provider.of<UserProvider>(context, listen: false)
+                        .fetchUser();
+                  },
+                  child: const Text("Sign Out", style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ],
           ),
         )
       ],
@@ -211,10 +225,10 @@ final List<Map<String, dynamic>> settings = [
     "onTap": () {},
   },
   {
-    "title": "Help",
+    "title": "Cerrar",
     "icon": Icons.help,
     "bgColor": Colors.red.shade100,
     "iconColor": Colors.red,
-    "onTap": () {},
+    "onTap": () async {},
   },
 ];
