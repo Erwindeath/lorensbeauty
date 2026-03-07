@@ -17,66 +17,76 @@ class ProfileScreen extends StatelessWidget {
 
     //print(user);
     return Scaffold(
-      
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 40),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "My Profile",
-                style: TextStyle(
-                    color: Color(0xff721c80),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 32),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con gradiente
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xff721c80), Color(0xffC46FA9)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
               ),
-              const SizedBox(
-                height: 12.0,
-              ),
-              const HorizontalLine(),
-              const SizedBox(
-                height: 20.0,
-              ),
-              Row(
-                // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CircleAvatar(
-                    radius: 35,
-                    //foregroundImage: NetworkImage(user!.photoURL.toString()),
-                    foregroundImage: user?.userMetadata?['avatar_url'] != null
-                        ? NetworkImage(user!.userMetadata!['avatar_url'])
-                        : null,
-                    child: user?.userMetadata?['avatar_url'] == null
-                        ? const Icon(Icons.person, size: 35)
-                        : null,
-                  ),
-                  const SizedBox(
-                    width: 20,
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                  child: Column(
                     children: [
-                      Text(user?.userMetadata?['full_name'] ?? "No Name",
-                          //user.displayName.toString(),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          )),
-                      Text(user?.email ?? "No Email",
-                          //user.email.toString(),
-                          style: TextStyle(
-                            color: Colors.grey.withOpacity(0.8),
-                            fontWeight: FontWeight.bold,
-                          )),
+                      CircleAvatar(
+                        radius: 45,
+                        backgroundColor: Colors.white.withOpacity(0.3),
+                        foregroundImage: user?.userMetadata?['avatar_url'] != null
+                            ? NetworkImage(user!.userMetadata!['avatar_url'])
+                            : null,
+                        child: user?.userMetadata?['avatar_url'] == null
+                            ? const Icon(Icons.person, size: 45, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        user?.userMetadata?['full_name'] ?? 'Sin nombre',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.email ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ],
-                  )
-                ],
+                  ),
+                ),
               ),
-              const SizedBox(
-                height: 40,
-              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Mi Perfil',
+                    style: TextStyle(
+                      color: Color(0xff721c80),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
               // Opciones según el rol
               if (role == 1) ...[
                 // Cliente: mostrar todas las opciones
@@ -200,9 +210,11 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20)
-            ],
-          ),
+              const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

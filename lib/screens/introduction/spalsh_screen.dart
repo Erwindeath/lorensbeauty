@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lorensbeauty/components/role_based_navigation.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
+import 'package:lorensbeauty/screens/auth/reset_password_screen.dart';
 import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +17,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   bool isAnimate = true;
   bool isClicked = false;
+  bool _handlingPasswordRecovery = false;
 
   final width = 50;
 
@@ -54,8 +56,22 @@ class _SplashScreenState extends State<SplashScreen> {
     supabase.auth.onAuthStateChange.listen((data) async {
       final AuthChangeEvent event = data.event;
       final Session? session = data.session;
-      print(event);
-      print(AuthChangeEvent.signedIn);
+
+      // Recuperación de contraseña via deep link
+      if (event == AuthChangeEvent.passwordRecovery) {
+        _handlingPasswordRecovery = true;
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+          );
+        }
+        return;
+      }
+
+      // Ignorar eventos posteriores si ya se está manejando el reset de contraseña
+      if (_handlingPasswordRecovery) return;
+
       if (event == AuthChangeEvent.initialSession ||
           event == AuthChangeEvent.signedIn) {
         if (mounted) {
@@ -63,19 +79,14 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       }
       if (event == AuthChangeEvent.initialSession) {
-        // Manejar estado inicial
         if (session != null) {
-          print("✅ Usuario autenticado (inicial)");
           navigateTo(const RoleBasedNavigation());
         } else {
-          print("❌ No hay usuario autenticado (inicial)");
           navigateTo(const OnBoardingScreen());
         }
       } else if (event == AuthChangeEvent.signedIn && session != null) {
-        print("✅ Usuario autenticado");
         navigateTo(const RoleBasedNavigation());
-      } else {
-        print("❌ No hay usuario autenticado");
+      } else if (event != AuthChangeEvent.passwordRecovery) {
         navigateTo(const OnBoardingScreen());
       }
     });

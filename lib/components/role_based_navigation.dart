@@ -186,11 +186,11 @@ class _AdminBottomNavigationState extends State<AdminBottomNavigation> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    const AdminDashboardScreen(), // Dashboard con estadísticas
-    const ProductsManagementScreen(), // Gestión de Productos
-    const ServicesManagementScreen(), // Gestión de Servicios
-    const OrderManagementPlaceholder(), // Gestión de Órdenes
-    const AdminSettingsScreen(), // Ajustes (Empleados, Promociones, Categorías)
+    const AdminDashboardScreen(),
+    const ProductsManagementScreen(),
+    const ServicesManagementScreen(),
+    const AdminOrdersScreen(),
+    const AdminSettingsScreen(),
   ];
 
   @override

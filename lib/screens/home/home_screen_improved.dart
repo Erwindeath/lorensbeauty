@@ -15,6 +15,14 @@ class HomeScreenImproved extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
+  late final Future<List<Map<String, dynamic>>> _productsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = _fetchProductsWithPhotos();
+  }
+
   Future<List<Map<String, dynamic>>> _fetchProductsWithPhotos() async {
     try {
       final response = await Supabase.instance.client
@@ -195,7 +203,7 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
 
             // Lista horizontal de productos
             FutureBuilder<List<Map<String, dynamic>>>(
-              future: _fetchProductsWithPhotos(),
+              future: _productsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(

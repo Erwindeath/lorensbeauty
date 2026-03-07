@@ -135,7 +135,10 @@ class Authentication {
   /// Recuperar contraseña
   static Future<bool> resetPassword({required String email}) async {
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'io.supabase.lorensbeauty://login-callback/',
+      );
       print("Email de recuperación enviado a: $email");
       return true;
     } catch (e) {
