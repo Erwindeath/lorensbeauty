@@ -185,13 +185,18 @@ class AdminBottomNavigation extends StatefulWidget {
 class _AdminBottomNavigationState extends State<AdminBottomNavigation> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const AdminDashboardScreen(),
-    const ProductsManagementScreen(),
-    const ServicesManagementScreen(),
-    const AdminOrdersScreen(),
-    const AdminSettingsScreen(),
-  ];
+  List<Widget> get _screens => [
+        AdminDashboardScreen(
+          onNavigateToTab: (index) {
+            if (!mounted) return;
+            setState(() => _selectedIndex = index);
+          },
+        ),
+        const ProductsManagementScreen(),
+        const ServicesManagementScreen(),
+        const AdminOrdersScreen(),
+        const AdminSettingsScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {

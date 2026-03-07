@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lorensbeauty/screens/admin/clients/admin_clients_insights_screen.dart';
+import 'package:lorensbeauty/screens/admin/orders/admin_schedule_screen.dart';
 import 'package:lorensbeauty/screens/admin/products/categories_management_screen.dart';
+import 'package:lorensbeauty/screens/admin/services/admin_services_insights_screen.dart';
 import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,7 +10,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // DASHBOARD ADMIN CON DATOS REALES
 // ============================================
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({Key? key}) : super(key: key);
+  final ValueChanged<int>? onNavigateToTab;
+
+  const AdminDashboardScreen({Key? key, this.onNavigateToTab}) : super(key: key);
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -90,7 +95,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -117,7 +122,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 0),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.all(40),
@@ -126,51 +131,84 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               )
             else
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.55,
-                  children: [
+              Transform.translate(
+                offset: const Offset(0, -10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.55,
+                    children: [
                     _buildStatCard(
                       icon: Icons.shopping_bag_outlined,
                       title: 'Productos',
                       value: '$_productsCount',
                       color: const Color(0xff3B82F6),
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Modulo pendiente hasta implementar inventario.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
                     ),
                     _buildStatCard(
                       icon: Icons.spa_outlined,
                       title: 'Servicios',
                       value: '$_servicesCount',
                       color: const Color(0xff10B981),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminServicesInsightsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildStatCard(
                       icon: Icons.receipt_long_outlined,
-                      title: '�rdenes',
+                      title: 'Órdenes',
                       value: '$_ordersCount',
                       color: const Color(0xffF59E0B),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminScheduleScreen()),
+                        );
+                      },
                     ),
                     _buildStatCard(
                       icon: Icons.people_outline,
                       title: 'Clientes',
                       value: '$_clientsCount',
                       color: const Color(0xff8B5CF6),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminClientsInsightsScreen(),
+                          ),
+                        );
+                      },
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    '�rdenes Recientes',
+                    'Órdenes Recientes',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -191,7 +229,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const Padding(
                 padding: EdgeInsets.all(40),
                 child: Center(
-                  child: Text('No hay �rdenes recientes', style: TextStyle(color: Colors.grey)),
+                  child: Text('No hay órdenes recientes', style: TextStyle(color: Colors.grey)),
                 ),
               )
             else
@@ -213,56 +251,64 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     required String title,
     required String value,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: color.withOpacity(0.1)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            Column(
+            ],
+            border: Border.all(color: color.withOpacity(0.1)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(icon, color: color, size: 20),
                 ),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -898,6 +944,7 @@ class AdminSettingsScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xff721c80),
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white)),

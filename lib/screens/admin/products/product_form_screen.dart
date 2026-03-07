@@ -240,6 +240,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               onPressed: _isLoading ? null : _saveProduct,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff721c80),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading
@@ -516,7 +517,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Eliminar'),
           ),
         ],
@@ -622,6 +626,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff721c80),
+                foregroundColor: Colors.white,
               ),
               child: isLoading
                   ? const SizedBox(

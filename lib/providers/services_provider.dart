@@ -120,33 +120,36 @@ class Service {
 // ============================================
 
 /// Provider para obtener todas las categorías activas
-final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) async{
+final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) async {
   try {
-    // Simular retardo para demostración
-    await Future.delayed(const Duration(milliseconds: 500));
- 
-  final categories = await Supabase.instance.client
+    final categories = await Supabase.instance.client
         .from('service_categories')
         .select()
         .eq('is_active', true)
         .order('display_order');
-  List<ServiceCategory> categoriesWithCount = [];
-    for (var categoryJson in categories) {
-      final productsResponse = await Supabase.instance.client
-          .from('services')
-          .select()
-          .eq('category_id', categoryJson['id'])
-          .eq('is_active', true);
 
-      categoryJson['services_count'] = productsResponse.length;
+    final services = await Supabase.instance.client
+        .from('services')
+        .select('id, category_id')
+        .eq('is_active', true);
+
+    final countByCategory = <int, int>{};
+    for (final service in services) {
+      final categoryId = service['category_id'] as int?;
+      if (categoryId == null) continue;
+      countByCategory[categoryId] = (countByCategory[categoryId] ?? 0) + 1;
+    }
+
+    final categoriesWithCount = <ServiceCategory>[];
+    for (var categoryJson in categories) {
+      categoryJson['services_count'] = countByCategory[categoryJson['id']] ?? 0;
       categoriesWithCount.add(ServiceCategory.fromJson(categoryJson));
     }
-  return categoriesWithCount;
-}
-  catch (e) {
+
+    return categoriesWithCount;
+  } catch (e) {
     print(e);
     return [];
-    
   }
 });
 
@@ -221,6 +224,59 @@ final formattedDurationProvider = Provider<String>((ref) {
 });
 
 // ============================================
+// CRUD DE SERVICIOS
+// ============================================
+
+Future<int> createService({
+  required String name,
+  int? categoryId,
+  String? description,
+  required double price,
+  required int durationMinutes,
+  bool isActive = true,
+}) async {
+  final response = await Supabase.instance.client
+      .from('services')
+      .insert({
+        'name': name,
+        'category_id': categoryId,
+        'description': description,
+        'price': price,
+        'duration_minutes': durationMinutes,
+        'is_active': isActive,
+      })
+      .select('id')
+      .single();
+
+  return response['id'] as int;
+}
+
+Future<void> updateService({
+  required int serviceId,
+  String? name,
+  required int? categoryId,
+  String? description,
+  double? price,
+  int? durationMinutes,
+  bool? isActive,
+}) async {
+  final updates = <String, dynamic>{};
+
+  if (name != null) updates['name'] = name;
+  updates['category_id'] = categoryId;
+  if (description != null) updates['description'] = description;
+  if (price != null) updates['price'] = price;
+  if (durationMinutes != null) updates['duration_minutes'] = durationMinutes;
+  if (isActive != null) updates['is_active'] = isActive;
+
+  await Supabase.instance.client.from('services').update(updates).eq('id', serviceId);
+}
+
+Future<void> deleteService(int serviceId) async {
+  await Supabase.instance.client.from('services').delete().eq('id', serviceId);
+}
+
+// ============================================
 // MÉTODOS HELPER
 // ============================================
 
@@ -250,3 +306,4 @@ void clearSelectedServices(WidgetRef ref) {
   ref.read(selectedServicesProvider.notifier).state = [];
   ref.read(selectedCategoryProvider.notifier).state = null;
 }
+
