@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../controller/auth_controller.dart';
 import '../../widgets/horizontal_line.dart';
+import '../introduction/onboarding_screen.dart';
 import '../orders/my_orders_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -179,10 +180,14 @@ class ProfileScreen extends StatelessWidget {
                   );
 
                   if (confirm == true) {
-                    await Authentication.signOut(context: context);
+                    await Authentication.signOut();
                     if (context.mounted) {
-                      await Provider.of<UserProvider>(context, listen: false)
-                          .fetchUser();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const OnBoardingScreen(),
+                        ),
+                        (route) => false,
+                      );
                     }
                   }
                 },

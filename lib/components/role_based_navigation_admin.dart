@@ -3,6 +3,8 @@ import 'package:lorensbeauty/screens/admin/clients/admin_clients_insights_screen
 import 'package:lorensbeauty/screens/admin/orders/admin_schedule_screen.dart';
 import 'package:lorensbeauty/screens/admin/products/categories_management_screen.dart';
 import 'package:lorensbeauty/screens/admin/services/admin_services_insights_screen.dart';
+import 'package:lorensbeauty/screens/admin/settings/admin_employees_management_screen.dart';
+import 'package:lorensbeauty/screens/admin/settings/store_schedule_management_screen.dart';
 import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -797,12 +799,22 @@ class AdminSettingsScreen extends StatelessWidget {
                       icon: Icons.people,
                       title: 'Empleados',
                       subtitle: 'Gestionar empleados del salón',
-                      onTap: () => _comingSoon(context)),
+                      onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminEmployeesManagementScreen(),
+                            ),
+                          )),
                   _buildItem(context,
                       icon: Icons.local_offer,
-                      title: 'Promociones',
-                      subtitle: 'Gestionar promociones y descuentos',
-                      onTap: () => _comingSoon(context)),
+                      title: 'Horario de Atencion',
+                      subtitle: 'Configurar horarios de reserva',
+                      onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminStoreScheduleScreen(),
+                            ),
+                          )),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Categorías', [
@@ -818,7 +830,12 @@ class AdminSettingsScreen extends StatelessWidget {
                       icon: Icons.spa,
                       title: 'Categorías de Servicios',
                       subtitle: 'Gestionar categorías de servicios',
-                      onTap: () => _comingSoon(context)),
+                      onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminEmployeesManagementScreen(),
+                            ),
+                          )),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Cuenta', [
@@ -826,7 +843,12 @@ class AdminSettingsScreen extends StatelessWidget {
                       icon: Icons.person,
                       title: 'Mi Perfil',
                       subtitle: 'Editar información personal',
-                      onTap: () => _comingSoon(context)),
+                      onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminEmployeesManagementScreen(),
+                            ),
+                          )),
                   _buildItem(context,
                       icon: Icons.logout,
                       title: 'Cerrar Sesión',
@@ -963,4 +985,5 @@ class AdminSettingsScreen extends StatelessWidget {
     }
   }
 }
+
 

@@ -223,6 +223,31 @@ final formattedDurationProvider = Provider<String>((ref) {
   return '$hours h ${minutes}min';
 });
 
+/// Foto principal por servicio (toma la primera por uploaded_at/id)
+final servicePrimaryPhotosProvider = FutureProvider<Map<int, String>>((ref) async {
+  try {
+    final rows = await Supabase.instance.client
+        .from('services_photos')
+        .select('service_id, photo_url, uploaded_at, id')
+        .order('service_id')
+        .order('uploaded_at')
+        .order('id');
+
+    final photoByService = <int, String>{};
+    for (final row in rows as List) {
+      final serviceId = row['service_id'] as int?;
+      final photoUrl = row['photo_url'] as String?;
+      if (serviceId == null || photoUrl == null || photoUrl.trim().isEmpty) {
+        continue;
+      }
+      photoByService.putIfAbsent(serviceId, () => photoUrl);
+    }
+    return photoByService;
+  } catch (_) {
+    return {};
+  }
+});
+
 // ============================================
 // CRUD DE SERVICIOS
 // ============================================

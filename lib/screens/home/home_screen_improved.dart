@@ -43,7 +43,7 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
         product.remove('product_photos');
       }
       return products;
-    } catch (e) {
+    } catch (_) {
       return [];
     }
   }
@@ -51,105 +51,141 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(serviceCategoriesProvider);
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header compacto con carrusel
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xff721c80), Color.fromARGB(255, 196, 103, 169)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(30),
-                      bottomRight: Radius.circular(30),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 18),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xff721c80), Color.fromARGB(255, 196, 103, 169)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Loren's Beauty",
+                        style: TextStyle(
+                          fontSize: 24,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Reserva tu cita o explora servicios y productos.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Loren's Beauty",
-                            style: TextStyle(
-                              fontSize: 24,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-                          ),
-                        ],
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (widget.onCategorySelected != null) {
+                          widget.onCategorySelected!();
+                        }
+                      },
+                      icon: const Icon(Icons.calendar_today, size: 18, color: Color(0xff721c80)),
+                      label: const Text(
+                        'Reservar ahora',
+                        style: TextStyle(
+                          color: Color(0xff721c80),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
                       ),
                     ),
                   ),
-                ),
-                const Positioned(
-                  top: 110,
-                  left: 0,
-                  right: 0,
-                  child: Carousel(),
-                ),
-              ],
+                ],
+              ),
             ),
-
-            const SizedBox(height: 80),
-
-            // Categorías de Servicios - Diseño compacto
+            const SizedBox(height: 12),
+            const Carousel(),
+            const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Servicios",
+                    'Servicios',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff721c80)),
                   ),
-                  TextButton.icon(
-                    onPressed: () {
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
                       if (widget.onCategorySelected != null) {
                         widget.onCategorySelected!();
                       }
                     },
-                    icon: const Icon(Icons.grid_view, size: 18),
-                    label: const Text('Ver todo'),
-                    style: TextButton.styleFrom(foregroundColor: const Color(0xff721c80)),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(Icons.grid_view, size: 16, color: Color(0xff721c80)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Ver todo',
+                            style: TextStyle(
+                              color: Color(0xff721c80),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-
-            // Grid compacto de categorías
+            const SizedBox(height: 2),
             categoriesAsync.when(
               data: (categories) {
                 if (categories.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.all(40),
-                    child: Center(child: Text('No hay categorías disponibles')),
+                    child: Center(child: Text('No hay categorias disponibles')),
                   );
                 }
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: GridView.builder(
+                    padding: EdgeInsets.zero,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -170,38 +206,32 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                 padding: EdgeInsets.all(40),
                 child: Center(child: CircularProgressIndicator(color: Color(0xff721c80))),
               ),
-              error: (error, stack) => const Padding(
+              error: (_, __) => const Padding(
                 padding: EdgeInsets.all(40),
-                child: Center(child: Text('Error al cargar categorías')),
+                child: Center(child: Text('Error al cargar categorias')),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // Productos Destacados
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Productos",
+                    'Productos',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xff721c80)),
                   ),
                   TextButton(
                     onPressed: () {
                       // TODO: Navegar a productos
                     },
-                    child: const Text('Ver todo'),
                     style: TextButton.styleFrom(foregroundColor: const Color(0xff721c80)),
+                    child: const Text('Ver todo'),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // Lista horizontal de productos
             FutureBuilder<List<Map<String, dynamic>>>(
               future: _productsFuture,
               builder: (context, snapshot) {
@@ -235,7 +265,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                 );
               },
             ),
-
             const SizedBox(height: 20),
           ],
         ),
@@ -243,7 +272,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
     );
   }
 
-  // Card de categoría compacta y profesional
   Widget _buildCompactCategoryCard(ServiceCategory category) {
     final color = _parseColor(category.colorHex);
     final serviceCountAsync = ref.watch(servicesByCategoryProvider(category.id));
@@ -316,7 +344,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
     );
   }
 
-  // Card de producto con modal al tocar
   Widget _buildProductCard(Map<String, dynamic> product) {
     return GestureDetector(
       onTap: () => _showProductModal(product),
@@ -337,7 +364,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen
             Hero(
               tag: 'product_${product['id']}',
               child: ClipRRect(
@@ -366,7 +392,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                       ),
               ),
             ),
-            // Info
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -390,7 +415,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
     );
   }
 
-  // Modal de producto con animación
   void _showProductModal(Map<String, dynamic> product) {
     showModalBottomSheet(
       context: context,
@@ -409,7 +433,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
             controller: controller,
             padding: const EdgeInsets.all(20),
             children: [
-              // Indicador de arrastre
               Center(
                 child: Container(
                   width: 40,
@@ -421,7 +444,6 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                   ),
                 ),
               ),
-              // Imagen grande con Hero animation
               if (product['img'] != null)
                 Hero(
                   tag: 'product_${product['id']}',
@@ -436,16 +458,14 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                   ),
                 ),
               const SizedBox(height: 20),
-              // Nombre del producto
               Text(
                 product['name'] ?? 'Sin nombre',
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xff721c80)),
               ),
               const SizedBox(height: 10),
-              // Descripción
               if (product['description'] != null) ...[
                 const Text(
-                  'Descripción',
+                  'Descripcion',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
@@ -455,18 +475,16 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
                 ),
               ],
               const SizedBox(height: 20),
-              // Botón de acción
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // TODO: Acción (agregar al carrito, etc.)
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xff721c80),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Más información', style: TextStyle(fontSize: 16, color: Colors.white)),
+                child: const Text('Mas informacion', style: TextStyle(fontSize: 16, color: Colors.white)),
               ),
             ],
           ),
@@ -479,7 +497,7 @@ class _HomeScreenImprovedState extends ConsumerState<HomeScreenImproved> {
     try {
       final hex = hexColor.replaceAll('#', '');
       return Color(int.parse('FF$hex', radix: 16));
-    } catch (e) {
+    } catch (_) {
       return const Color(0xff721c80);
     }
   }

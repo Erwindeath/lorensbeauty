@@ -170,9 +170,10 @@ List<MenuItem> adminMenuItems(BuildContext context) {
       title: 'Cerrar Sesión',
       trailingIcon: Icons.arrow_forward_ios_outlined,
       onTap: () async {
-        await Authentication.signOut(context: context);
+        await Authentication.signOut();
         await Provider.of<UserProvider>(context, listen: false).fetchUser();
       },
     ),
   ];
 }
+

@@ -28,6 +28,7 @@ class _ServicesManagementScreenState
   Widget build(BuildContext context) {
     final servicesAsync = ref.watch(allServicesProvider);
     final categoriesAsync = ref.watch(serviceCategoriesProvider);
+    final servicePhotosAsync = ref.watch(servicePrimaryPhotosProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -156,8 +157,14 @@ class _ServicesManagementScreenState
                               mainAxisSpacing: 12,
                               childAspectRatio: 0.82,
                             ),
-                            itemBuilder: (context, index) =>
-                                _buildServiceCard(filtered[index], categoryNameById),
+                            itemBuilder: (context, index) => _buildServiceCard(
+                              filtered[index],
+                              categoryNameById,
+                              servicePhotosAsync.maybeWhen(
+                                data: (map) => map[filtered[index].id],
+                                orElse: () => null,
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -193,7 +200,11 @@ class _ServicesManagementScreenState
     }).toList();
   }
 
-  Widget _buildServiceCard(Service service, Map<int, String> categoryNameById) {
+  Widget _buildServiceCard(
+    Service service,
+    Map<int, String> categoryNameById,
+    String? primaryPhotoUrl,
+  ) {
     final categoryName = service.categoryId == null
         ? 'Sin categoria'
         : (categoryNameById[service.categoryId!] ?? 'Categoria ${service.categoryId}');
@@ -206,9 +217,10 @@ class _ServicesManagementScreenState
           Expanded(
             child: SizedBox(
               width: double.infinity,
-              child: (service.img != null && service.img!.isNotEmpty)
+              child: ((primaryPhotoUrl != null && primaryPhotoUrl.isNotEmpty) ||
+                      (service.img != null && service.img!.isNotEmpty))
                   ? Image.network(
-                      service.img!,
+                      primaryPhotoUrl ?? service.img!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.grey[300],

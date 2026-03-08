@@ -2,193 +2,136 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 
 class Carousel extends StatelessWidget {
-  const Carousel({
-    Key? key,
-  }) : super(key: key);
+  const Carousel({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return CarouselSlider(
-      items: [
-        Container(
-          height: 40,
-          width: 400,
-          margin: const EdgeInsets.all(6.0),
-          decoration: BoxDecoration(
-            color: const Color(0xff721c80),
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xff721c80),
-                Color.fromARGB(255, 196, 103, 169),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: Row(
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children:  [
-                  Spacer(
-                    flex: 2,
-                  ),
-                  Text(
-                    "Look Awesome",
-                    style: TextStyle(
-                        color: Color(0xffffffff),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(
-                    height: 5,
-                  ),
-                  Text(
-                    "& Save Some",
-                    style: TextStyle(
-                      color: Color(0xffffffff),
-                      fontWeight: FontWeight.bold,
-                      fontStyle: FontStyle.italic,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Spacer(),
-                  Btn(text: "Get upto 20% off"),
-                ],
-              ),
-              const Spacer(),
-              Align(
-                child: Image.network(
-                  "https://images.squarespace-cdn.com/content/v1/5e867df9747b0e555c337eef/1589945925617-4NY8TG8F76FH1O0P46FW/Kampaamo-helsinki-hair-design-balayage-hiustenpidennys-varjays.png",
-                  width: 120,
-                  height: 400,
-                  fit: BoxFit.cover,
+    final items = <_PromoItem>[
+      const _PromoItem(
+        title: 'Luce increible',
+        subtitle: 'Ahorra en tus tratamientos',
+        cta: 'Ver promos',
+        imageUrl:
+            'https://images.squarespace-cdn.com/content/v1/5e867df9747b0e555c337eef/1589945925617-4NY8TG8F76FH1O0P46FW/Kampaamo-helsinki-hair-design-balayage-hiustenpidennys-varjays.png',
+      ),
+      const _PromoItem(
+        title: 'Reserva tu cita',
+        subtitle: 'Rapido y sin llamadas',
+        cta: 'Reservar ahora',
+        imageUrl:
+            'https://img.grouponcdn.com/bynder/2sLSquS1xGWk4QjzYuL7h461CDsJ/2s-2048x1229/v1/sc600x600.jpg',
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: CarouselSlider.builder(
+        itemCount: items.length,
+        options: CarouselOptions(
+          height: 178,
+          autoPlay: true,
+          autoPlayInterval: const Duration(seconds: 4),
+          autoPlayAnimationDuration: const Duration(milliseconds: 700),
+          enlargeCenterPage: true,
+          viewportFraction: 0.92,
+        ),
+        itemBuilder: (context, index, realIndex) {
+          final item = items[index];
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xff721c80), Color.fromARGB(255, 196, 103, 169)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-            ],
-          ),
-        ),
-
-        Container(
-          height: 40,
-          width: 400,
-          margin: const EdgeInsets.all(6.0),
-          decoration: BoxDecoration(
-            color: const Color(0xff721c80),
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xff721c80),
-                Color.fromARGB(255, 196, 103, 169),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: Row(
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Row(
                 children: [
-                  Spacer(
-                    flex: 2,
-                  ),
-                  Text(
-                    "Book your\nAppointment",
-                    style: TextStyle(
-                        color: Color(0xffffffff),
-                        fontStyle: FontStyle.italic,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(
-                    height: 5,
-                  ),
-                  Text(
-                    "Now",
-                    style: TextStyle(
-                      color: Color(0xffffffff),
-                      fontWeight: FontWeight.bold,
-                      fontStyle: FontStyle.italic,
-                      fontSize: 16,
+                  Expanded(
+                    flex: 6,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            item.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: Text(
+                              item.cta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  Spacer(),
-                  Btn(text: "Book Here!"),
+                  Expanded(
+                    flex: 4,
+                    child: Image.network(
+                      item.imageUrl,
+                      fit: BoxFit.cover,
+                      height: double.infinity,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.white24,
+                        child: const Icon(Icons.image_not_supported, color: Colors.white),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const Spacer(),
-              Align(
-                child: Image.network(
-                  "https://img.grouponcdn.com/bynder/2sLSquS1xGWk4QjzYuL7h461CDsJ/2s-2048x1229/v1/sc600x600.jpg",
-                  width: 120,
-                  height: 400,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-      ],
-      options: CarouselOptions(
-        //autoPlayInterval: Duration(minutes: 1),
-        disableCenter: true,
-        reverse: false,
-        enableInfiniteScroll: false,
-        height: 180.0,
-        enlargeCenterPage: true,
-        autoPlay: true,
-        aspectRatio: 10 / 8,
-        autoPlayCurve: Curves.easeInOut,
-        autoPlayAnimationDuration: const Duration(milliseconds: 800),
-        viewportFraction: 0.78,
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-class Btn extends StatelessWidget {
-  final String text;
-  const Btn({
-    Key? key,
-    required this.text,
-  }) : super(key: key);
+class _PromoItem {
+  final String title;
+  final String subtitle;
+  final String cta;
+  final String imageUrl;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 30),
-      padding: const EdgeInsets.all(12),
-      height: 40,
-      width: 150,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(50),
-        color: const Color(0xff721c80),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xff721c80),
-            Color.fromARGB(255, 196, 103, 169),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-          child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-        ),
-      )),
-    );
-  }
+  const _PromoItem({
+    required this.title,
+    required this.subtitle,
+    required this.cta,
+    required this.imageUrl,
+  });
 }
