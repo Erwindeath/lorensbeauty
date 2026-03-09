@@ -56,11 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (user != null && mounted) {
         // Navegar a la pantalla principal
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => const RoleBasedNavigation(),
           ),
+          (route) => false,
         );
       } else if (mounted) {
         _showErrorSnackBar('Error al iniciar sesión. Verifica tus credenciales.');
@@ -83,11 +84,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = await Authentication.signInWithGoogle(context: context);
 
       if (user != null && mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => const RoleBasedNavigation(),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -430,3 +432,4 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     );
   }
 }
+

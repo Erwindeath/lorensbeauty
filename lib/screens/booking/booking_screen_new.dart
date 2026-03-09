@@ -23,18 +23,9 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _scheduleSectionKey = GlobalKey();
 
-  // Horarios disponibles
-  final List<String> timeSlots = [
-    "09:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "02:00 PM",
-    "03:00 PM",
-    "04:00 PM",
-    "05:00 PM",
-    "06:00 PM",
-  ];
+  // Horarios disponibles segun configuracion admin (store_booking_slots)
+  List<String> _availableTimeSlots = const [];
+  bool _loadingTimeSlots = true;
 
   int selectedTimeIndex = -1;
 
@@ -62,6 +53,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
     final selectedCategory = ref.read(selectedCategoryProvider);
     _selectedCategoryId = selectedCategory?.id;
     ref.read(selectedCategoryProvider.notifier).state = null;
+    _loadTimeSlotsForDate(ref.read(selectedBookingDateProvider));
   }
 
   @override
@@ -73,6 +65,15 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DateTime>(selectedBookingDateProvider, (previous, next) {
+      if (previous == null ||
+          previous.year != next.year ||
+          previous.month != next.month ||
+          previous.day != next.day) {
+        _loadTimeSlotsForDate(next);
+      }
+    });
+
     final selectedServices = ref.watch(selectedServicesProvider);
     final totalPrice = ref.watch(formattedTotalProvider);
     final totalDuration = ref.watch(formattedDurationProvider);
@@ -202,7 +203,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                     if (selectedServices.isNotEmpty) _buildSummary(totalPrice, totalDuration),
                     const SizedBox(height: 20),
                     if (selectedServices.isNotEmpty)
-                      _buildConfirmButton(context, selectedServices, selectedTimeIndex),
+                      _buildConfirmButton(context, selectedServices),
                   ],
                 ),
               ),
@@ -802,11 +803,36 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
 
   // Construir horarios
   Widget _buildTimeSlots() {
+    if (_loadingTimeSlots) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: CircularProgressIndicator(color: Color(0xff721c80)),
+        ),
+      );
+    }
+
+    if (_availableTimeSlots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Text(
+          'No hay horarios disponibles para este dia.',
+          style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: List.generate(
-        timeSlots.length,
+        _availableTimeSlots.length,
         (index) => GestureDetector(
           onTap: () => setState(() => selectedTimeIndex = index),
           child: Container(
@@ -820,7 +846,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
               ),
             ),
             child: Text(
-              timeSlots[index],
+              _availableTimeSlots[index],
               style: TextStyle(
                 color: selectedTimeIndex == index ? Colors.white : Colors.black87,
                 fontWeight: selectedTimeIndex == index ? FontWeight.bold : FontWeight.normal,
@@ -913,11 +939,15 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
   Widget _buildConfirmButton(
     BuildContext context,
     List<Service> selectedServices,
-    int selectedTimeIndex,
   ) {
     return GestureDetector(
       onTap: () async {
-        if (selectedTimeIndex < 0) {
+        final selectedSlot =
+            (selectedTimeIndex >= 0 && selectedTimeIndex < _availableTimeSlots.length)
+                ? _availableTimeSlots[selectedTimeIndex]
+                : null;
+
+        if (selectedSlot == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Por favor selecciona un horario'),
@@ -933,7 +963,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
           builder: (context) => AlertDialog(
             title: const Text('Finalizar reserva'),
             content: Text(
-              '¿Confirmas tu reserva para ${timeSlots[selectedTimeIndex]}?\n\n'
+              '¿Confirmas tu reserva para $selectedSlot?\n\n'
               'Servicios: ${selectedServices.length}\n'
               'Total: ${ref.read(formattedTotalProvider)}',
             ),
@@ -979,7 +1009,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
             final selectedDate = ref.read(selectedBookingDateProvider);
 
             // Convertir hora seleccionada a formato TIME (HH:mm:ss)
-            final timeSlot = timeSlots[selectedTimeIndex];
+            final timeSlot = selectedSlot;
             final timeParts = _parseTimeSlot(timeSlot);
 
             // Calcular totales
@@ -1118,7 +1148,65 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
       return '09:00:00'; // Por defecto
     }
   }
+
+  Future<void> _loadTimeSlotsForDate(DateTime date) async {
+    setState(() {
+      _loadingTimeSlots = true;
+      selectedTimeIndex = -1;
+    });
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('store_booking_slots')
+          .select('slot_time')
+          .eq('weekday', date.weekday)
+          .order('slot_time');
+
+      final slots = (rows as List)
+          .map((r) => r['slot_time']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .map(_formatSlotForDisplay)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _availableTimeSlots = slots;
+        _loadingTimeSlots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availableTimeSlots = const [];
+        _loadingTimeSlots = false;
+      });
+    }
+  }
+
+  String _formatSlotForDisplay(String raw) {
+    final normalized = _normalizeDbTime(raw);
+    final parts = normalized.split(':');
+    if (parts.length < 2) return normalized;
+
+    var hour = int.tryParse(parts[0]) ?? 0;
+    final minute = parts[1].padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    if (hour == 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
+    }
+    return '${hour.toString().padLeft(2, '0')}:$minute $period';
+  }
+
+  String _normalizeDbTime(String raw) {
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final h = parts[0].padLeft(2, '0');
+    final m = parts[1].padLeft(2, '0');
+    return '$h:$m';
+  }
 }
+
 
 
 

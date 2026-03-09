@@ -12,6 +12,10 @@ class OrderService {
   final String serviceName;
   final double servicePrice;
   final int serviceDuration; // en minutos
+  final String status; // pending, in_progress, completed
+  final String? employeeId;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
 
   OrderService({
     required this.id,
@@ -20,6 +24,10 @@ class OrderService {
     required this.serviceName,
     required this.servicePrice,
     required this.serviceDuration,
+    this.status = 'pending',
+    this.employeeId,
+    this.startedAt,
+    this.completedAt,
   });
 
   factory OrderService.fromJson(Map<String, dynamic> json) {
@@ -30,6 +38,14 @@ class OrderService {
       serviceName: json['service_name'] as String,
       servicePrice: (json['service_price'] as num).toDouble(),
       serviceDuration: json['service_duration'] as int,
+      status: (json['status'] as String?) ?? 'pending',
+      employeeId: json['employee_id'] as String?,
+      startedAt: json['started_at'] != null
+          ? DateTime.tryParse(json['started_at'].toString())
+          : null,
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'].toString())
+          : null,
     );
   }
 
@@ -41,6 +57,10 @@ class OrderService {
       'service_name': serviceName,
       'service_price': servicePrice,
       'service_duration': serviceDuration,
+      'status': status,
+      'employee_id': employeeId,
+      'started_at': startedAt?.toIso8601String(),
+      'completed_at': completedAt?.toIso8601String(),
     };
   }
 
@@ -437,5 +457,171 @@ Future<bool> completeOrder(int orderId) async {
   } catch (e) {
     print('Error completando orden: $e');
     return false;
+  }
+}
+
+/// Iniciar un servicio puntual dentro de una orden (si la tabla lo soporta)
+Future<bool> startOrderService({
+  required int orderId,
+  required int orderServiceId,
+  required String employeeId,
+}) async {
+  try {
+    final current = await Supabase.instance.client
+        .from('order_services')
+        .select('status,employee_id')
+        .eq('id', orderServiceId)
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+    if (current == null) return false;
+
+    final status = (current['status']?.toString() ?? 'pending').toLowerCase();
+    final currentEmployeeId = current['employee_id']?.toString();
+
+    if (status == 'completed') return false;
+    if (status == 'in_progress') {
+      if (currentEmployeeId == null || currentEmployeeId == employeeId) {
+        return true;
+      }
+      return false;
+    }
+
+    await Supabase.instance.client
+        .from('order_services')
+        .update({
+          'status': 'in_progress',
+          'employee_id': employeeId,
+          'started_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', orderServiceId)
+        .eq('order_id', orderId);
+
+    await _syncOrderStatusFromServices(orderId, employeeId);
+    return true;
+  } catch (e) {
+    print('Error iniciando servicio individual: $e');
+    return false;
+  }
+}
+
+/// Completar un servicio puntual dentro de una orden (si la tabla lo soporta)
+Future<bool> completeOrderService({
+  required int orderId,
+  required int orderServiceId,
+  required String employeeId,
+}) async {
+  try {
+    final current = await Supabase.instance.client
+        .from('order_services')
+        .select('status,employee_id')
+        .eq('id', orderServiceId)
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+    if (current == null) return false;
+
+    final status = (current['status']?.toString() ?? 'pending').toLowerCase();
+    final currentEmployeeId = current['employee_id']?.toString();
+
+    if (status == 'completed') return true;
+    if (status != 'in_progress') return false;
+    if (currentEmployeeId != null && currentEmployeeId != employeeId) return false;
+
+    await Supabase.instance.client
+        .from('order_services')
+        .update({
+          'status': 'completed',
+          'employee_id': employeeId,
+          'completed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', orderServiceId)
+        .eq('order_id', orderId);
+
+    await _syncOrderStatusFromServices(orderId, employeeId);
+    return true;
+  } catch (e) {
+    print('Error completando servicio individual: $e');
+    return false;
+  }
+}
+
+Future<void> _syncOrderStatusFromServices(int orderId, String employeeId) async {
+  try {
+    final rows = await Supabase.instance.client
+        .from('order_services')
+        .select('status,started_at,completed_at')
+        .eq('order_id', orderId);
+
+    if ((rows as List).isEmpty) return;
+
+    final order = await Supabase.instance.client
+        .from('orders')
+        .select('start_time,end_time')
+        .eq('id', orderId)
+        .single();
+
+    final statuses = <String>[];
+    DateTime? firstStartedAt;
+    DateTime? lastCompletedAt;
+    for (final row in rows) {
+      final status = (row['status']?.toString() ?? 'pending').toLowerCase();
+      statuses.add(status);
+
+      final startedAtRaw = row['started_at']?.toString();
+      if (startedAtRaw != null) {
+        final startedAt = DateTime.tryParse(startedAtRaw);
+        if (startedAt != null &&
+            (firstStartedAt == null || startedAt.isBefore(firstStartedAt))) {
+          firstStartedAt = startedAt;
+        }
+      }
+
+      final completedAtRaw = row['completed_at']?.toString();
+      if (completedAtRaw != null) {
+        final completedAt = DateTime.tryParse(completedAtRaw);
+        if (completedAt != null &&
+            (lastCompletedAt == null || completedAt.isAfter(lastCompletedAt))) {
+          lastCompletedAt = completedAt;
+        }
+      }
+    }
+
+    final allCompleted = statuses.every((s) => s == 'completed');
+    final anyInProgress = statuses.any((s) => s == 'in_progress');
+    final anyCompleted = statuses.any((s) => s == 'completed');
+
+    final startTimeRaw = order['start_time']?.toString();
+    final existingStartTime =
+        startTimeRaw != null ? DateTime.tryParse(startTimeRaw) : null;
+
+    if (allCompleted) {
+      final effectiveStart = existingStartTime ?? firstStartedAt ?? DateTime.now();
+      final effectiveEnd = lastCompletedAt ?? DateTime.now();
+      await Supabase.instance.client
+          .from('orders')
+          .update({
+            'status': 'completed',
+            'start_time': effectiveStart.toIso8601String(),
+            'end_time': effectiveEnd.toIso8601String(),
+          })
+          .eq('id', orderId);
+      return;
+    }
+
+    if (anyInProgress || anyCompleted) {
+      final effectiveStart = existingStartTime ?? firstStartedAt ?? DateTime.now();
+      await Supabase.instance.client
+          .from('orders')
+          .update({
+            'status': 'in_progress',
+            'employee_id': employeeId,
+            'start_time': effectiveStart.toIso8601String(),
+            'end_time': null,
+          })
+          .eq('id', orderId);
+    }
+  } catch (e) {
+    print('Error sincronizando estado de orden: $e');
   }
 }

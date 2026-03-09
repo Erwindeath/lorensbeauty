@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lorensbeauty/screens/admin/clients/admin_clients_insights_screen.dart';
+import 'package:lorensbeauty/screens/admin/orders/admin_employee_activity_screen.dart';
 import 'package:lorensbeauty/screens/admin/orders/admin_schedule_screen.dart';
 import 'package:lorensbeauty/screens/admin/products/categories_management_screen.dart';
 import 'package:lorensbeauty/screens/admin/services/admin_services_insights_screen.dart';
@@ -440,17 +441,113 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final client = Supabase.instance.client;
       var query = client
           .from('orders')
-          .select('id, status, total_price, order_date, order_time, total_duration');
+          .select(
+              'id, user_id, employee_id, status, total_price, order_date, order_time, total_duration, notes');
 
       if (_selectedFilter != 'all') {
         query = query.eq('status', _selectedFilter);
       }
 
       final response = await query.order('created_at', ascending: false).limit(50);
+      final baseOrders = List<Map<String, dynamic>>.from(response as List);
+
+      final userIds = baseOrders
+          .map((o) => o['user_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final employeeIds = baseOrders
+          .map((o) => o['employee_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final orderIds = baseOrders
+          .map((o) => o['id'])
+          .where((id) => id != null)
+          .map((id) => id as int)
+          .toList();
+
+      final namesById = <String, String>{};
+      final idsToLoad = {...userIds, ...employeeIds}.toList();
+      if (idsToLoad.isNotEmpty) {
+        final profiles = await client
+            .from('user_profiles')
+            .select('id, full_name')
+            .inFilter('id', idsToLoad);
+        for (final row in (profiles as List)) {
+          final map = Map<String, dynamic>.from(row);
+          final id = map['id']?.toString();
+          if (id == null) continue;
+          final full = map['full_name']?.toString().trim();
+          namesById[id] = (full == null || full.isEmpty) ? 'Sin nombre' : full;
+        }
+      }
+
+      final servicesByOrderId = <int, List<Map<String, dynamic>>>{};
+      final serviceEmployeeIds = <String>{};
+      if (orderIds.isNotEmpty) {
+        final serviceRows = await client
+            .from('order_services')
+            .select(
+                'id, order_id, service_name, service_duration, service_price, status, employee_id')
+            .inFilter('order_id', orderIds);
+        for (final row in (serviceRows as List)) {
+          final map = Map<String, dynamic>.from(row);
+          final orderId = map['order_id'] as int?;
+          if (orderId == null) continue;
+          final serviceEmployeeId = map['employee_id']?.toString();
+          if (serviceEmployeeId != null && serviceEmployeeId.isNotEmpty) {
+            serviceEmployeeIds.add(serviceEmployeeId);
+          }
+          servicesByOrderId.putIfAbsent(orderId, () => []).add(map);
+        }
+      }
+
+      final missingServiceEmployeeIds =
+          serviceEmployeeIds.where((id) => !namesById.containsKey(id)).toList();
+      if (missingServiceEmployeeIds.isNotEmpty) {
+        final profileRows = await client
+            .from('user_profiles')
+            .select('id, full_name')
+            .inFilter('id', missingServiceEmployeeIds);
+        for (final row in (profileRows as List)) {
+          final map = Map<String, dynamic>.from(row);
+          final id = map['id']?.toString();
+          if (id == null) continue;
+          final full = map['full_name']?.toString().trim();
+          namesById[id] = (full == null || full.isEmpty) ? 'Sin nombre' : full;
+        }
+      }
+
+      final enriched = baseOrders.map((order) {
+        final clientId = order['user_id']?.toString();
+        final employeeId = order['employee_id']?.toString();
+        final orderId = order['id'] as int?;
+        final rawServices = orderId == null
+            ? const <Map<String, dynamic>>[]
+            : (servicesByOrderId[orderId] ?? const <Map<String, dynamic>>[]);
+        final enrichedServices = rawServices.map((s) {
+          final serviceEmployeeId = s['employee_id']?.toString();
+          return {
+            ...s,
+            'employee_name': serviceEmployeeId == null
+                ? 'Sin asignar'
+                : (namesById[serviceEmployeeId] ?? 'Sin nombre'),
+          };
+        }).toList();
+
+        return {
+          ...order,
+          'client_name': clientId == null ? 'Cliente' : (namesById[clientId] ?? 'Cliente'),
+          'employee_name':
+              employeeId == null ? 'Sin asignar' : (namesById[employeeId] ?? 'Sin nombre'),
+          'services': enrichedServices,
+        };
+      }).toList();
 
       if (mounted) {
         setState(() {
-          _orders = List<Map<String, dynamic>>.from(response as List);
+          _orders = List<Map<String, dynamic>>.from(enriched);
           _loading = false;
         });
       }
@@ -482,6 +579,240 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         );
       }
     }
+  }
+
+  Future<void> _openQuickUnassign(dynamic orderId) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('order_services')
+          .select('id, service_name, status, employee_id')
+          .eq('order_id', orderId)
+          .eq('status', 'in_progress');
+      final services =
+          (rows as List).map((e) => Map<String, dynamic>.from(e)).toList();
+
+      final employeeIds = services
+          .map((s) => s['employee_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final employeeNames = <String, String>{};
+      if (employeeIds.isNotEmpty) {
+        final profileRows = await Supabase.instance.client
+            .from('user_profiles')
+            .select('id, full_name')
+            .inFilter('id', employeeIds);
+        for (final row in (profileRows as List)) {
+          final map = Map<String, dynamic>.from(row);
+          final id = map['id']?.toString();
+          if (id == null) continue;
+          final name = map['full_name']?.toString().trim();
+          employeeNames[id] =
+              (name == null || name.isEmpty) ? 'Empleado' : name;
+        }
+      }
+
+      if (!mounted) return;
+      if (services.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No hay servicios en progreso para desasignar.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Text(
+                    'Desasignar - Orden #$orderId',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xff721c80),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...services.map((s) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s['service_name']?.toString() ?? 'Servicio',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Empleado: ${employeeNames[s['employee_id']?.toString()] ?? 'Sin nombre'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                await _quickUnassignService(
+                                  serviceId: s['id'],
+                                  orderId: orderId,
+                                );
+                                if (mounted) Navigator.pop(context);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.red.withOpacity(0.25)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.person_off,
+                                        size: 16, color: Colors.red.shade700),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Desasignar',
+                                      style: TextStyle(
+                                        color: Colors.red.shade700,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar servicios: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _quickUnassignService({
+    required dynamic serviceId,
+    required dynamic orderId,
+  }) async {
+    try {
+      await Supabase.instance.client.from('order_services').update({
+        'status': 'pending',
+        'employee_id': null,
+        'started_at': null,
+        'completed_at': null,
+      }).eq('id', serviceId);
+
+      await _syncOrderStatusFromServices(orderId);
+      await _loadOrders();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Servicio desasignado correctamente.'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo desasignar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _syncOrderStatusFromServices(dynamic orderId) async {
+    final rows = await Supabase.instance.client
+        .from('order_services')
+        .select('status, employee_id')
+        .eq('order_id', orderId);
+    final list =
+        (rows as List).map((e) => Map<String, dynamic>.from(e)).toList();
+    if (list.isEmpty) return;
+
+    final statuses = list
+        .map((r) => (r['status']?.toString() ?? 'pending').toLowerCase())
+        .toList();
+    final allCompleted = statuses.every((s) => s == 'completed');
+    final anyInProgress = statuses.any((s) => s == 'in_progress');
+    final anyCompleted = statuses.any((s) => s == 'completed');
+    final anyInProgressEmployee = list
+        .firstWhere(
+          (r) =>
+              (r['status']?.toString() ?? '').toLowerCase() == 'in_progress' &&
+              r['employee_id'] != null,
+          orElse: () => <String, dynamic>{},
+        )['employee_id'];
+
+    if (allCompleted) {
+      await Supabase.instance.client.from('orders').update({
+        'status': 'completed',
+      }).eq('id', orderId);
+      return;
+    }
+    if (anyInProgress || anyCompleted) {
+      await Supabase.instance.client.from('orders').update({
+        'status': 'in_progress',
+        'employee_id': anyInProgressEmployee,
+      }).eq('id', orderId);
+      return;
+    }
+    await Supabase.instance.client.from('orders').update({
+      'status': 'confirmed',
+      'employee_id': null,
+      'start_time': null,
+      'end_time': null,
+    }).eq('id', orderId);
   }
 
   @override
@@ -616,7 +947,9 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         : '-';
     final duration = order['total_duration'] as int? ?? 0;
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showOrderDetail(order),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -655,6 +988,15 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               ],
             ),
             const SizedBox(height: 10),
+            Text(
+              order['client_name']?.toString() ?? 'Cliente',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade500),
@@ -685,6 +1027,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              'Empleado: ${order['employee_name']?.toString() ?? 'Sin asignar'}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Servicios: ${((order['services'] as List?) ?? const []).length}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
 
             // Acciones para pending y confirmed
             if (status == 'pending' || status == 'confirmed') ...[
@@ -707,8 +1059,197 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ],
               ),
             ],
+            if (status == 'in_progress') ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: _actionBtn(
+                  'Desasignar servicio (rápido)',
+                  Colors.deepOrange,
+                  () => _openQuickUnassign(order['id']),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    ));
+  }
+
+  void _showOrderDetail(Map<String, dynamic> order) {
+    final services = ((order['services'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final status = order['status'] as String? ?? 'pending';
+    final info = _statusInfo(status);
+    final notes = order['notes']?.toString();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.82,
+        minChildSize: 0.55,
+        maxChildSize: 0.95,
+        builder: (_, controller) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(18),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Orden #${order['id']}',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: (info['color'] as Color).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      info['label'] as String,
+                      style: TextStyle(
+                        color: info['color'] as Color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _detailLine('Cliente', order['client_name']?.toString() ?? 'Cliente'),
+              _detailLine('Empleado', order['employee_name']?.toString() ?? 'Sin asignar'),
+              _detailLine('Fecha', '${order['order_date'] ?? '-'}  ${order['order_time'] ?? '-'}'),
+              _detailLine('Duración', '${order['total_duration'] ?? 0} min'),
+              _detailLine('Total', '\$${double.tryParse((order['total_price'] ?? 0).toString())?.toStringAsFixed(2) ?? order['total_price']}'),
+              if (notes != null && notes.trim().isNotEmpty) _detailLine('Notas', notes.trim()),
+              const SizedBox(height: 14),
+              const Text(
+                'Servicios de la orden',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xff721c80),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (services.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: const Text('No hay servicios cargados para esta orden.'),
+                )
+              else
+                ...services.map((s) {
+                  final st = _statusInfo(s['status']?.toString() ?? 'pending');
+                  final serviceEmployee = s['employee_id']?.toString();
+                  final serviceEmployeeName =
+                      s['employee_name']?.toString() ?? 'Sin asignar';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s['service_name']?.toString() ?? 'Servicio',
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${s['service_duration'] ?? 0} min • \$${double.tryParse((s['service_price'] ?? 0).toString())?.toStringAsFixed(2) ?? s['service_price']}',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              if (serviceEmployee != null)
+                                Text(
+                                  'Empleado: $serviceEmployeeName',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (st['color'] as Color).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            st['label'] as String,
+                            style: TextStyle(
+                              color: st['color'] as Color,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailLine(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 82,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -803,6 +1344,16 @@ class AdminSettingsScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const AdminEmployeesManagementScreen(),
+                            ),
+                          )),
+                  _buildItem(context,
+                      icon: Icons.fact_check,
+                      title: 'Operación empleados',
+                      subtitle: 'Monitoreo y desasignación rápida',
+                      onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AdminEmployeeActivityScreen(),
                             ),
                           )),
                   _buildItem(context,

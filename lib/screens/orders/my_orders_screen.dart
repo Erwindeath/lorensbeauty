@@ -25,6 +25,8 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xff721c80),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: Column(
@@ -693,10 +695,11 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                       Navigator.pop(context);
                       _showQRCode(order);
                     },
-                    icon: const Icon(Icons.qr_code, size: 20),
-                    label: const Text('Mostrar Código QR'),
+                    icon: const Icon(Icons.qr_code, size: 20, color: Colors.white),
+                    label: const Text('Mostrar Código QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xff721c80),
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -836,3 +839,4 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     );
   }
 }
+

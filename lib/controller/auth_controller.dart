@@ -49,7 +49,6 @@ class Authentication {
     await Supabase.instance.client.auth.signOut();
 
     await googleSignIn.signOut();
-print("Sesión cerrada exitosamente.");
   }
 
   // ============================================

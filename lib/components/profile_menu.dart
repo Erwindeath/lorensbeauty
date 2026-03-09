@@ -13,7 +13,8 @@ class CardAdmin extends StatelessWidget {
   final Widget? userMoreInfo;
   final ImageProvider userProfilePic;
 
-  const CardAdmin({Key? key, 
+  const CardAdmin({
+    Key? key,
     this.backgroundColor,
     this.settingColor,
     this.cardRadius = 30,
@@ -176,4 +177,3 @@ List<MenuItem> adminMenuItems(BuildContext context) {
     ),
   ];
 }
-

@@ -54,6 +54,7 @@ class _CustomDatePickerState extends ConsumerState<CustomDatePicker> {
           padding: const EdgeInsets.only(top: 12, bottom: 8),
           child: DatePicker(
             DateTime.now(),
+            locale: 'es_ES',
             daysCount: 30,
             deactivatedColor: Colors.white,
             initialSelectedDate: DateTime.now(),
@@ -90,21 +91,21 @@ class _CustomDatePickerState extends ConsumerState<CustomDatePicker> {
   String setMonth(monthNo) {
     switch (monthNo) {
       case 1:
-        return "Jan";
+        return "Ene";
       case 2:
         return "Feb";
       case 3:
         return "Mar";
       case 4:
-        return "Apr";
+        return "Abr";
       case 5:
         return "May";
       case 6:
-        return "June";
+        return "Jun";
       case 7:
         return "Jul";
       case 8:
-        return "Aug";
+        return "Ago";
       case 9:
         return "Sep";
       case 10:
@@ -112,7 +113,7 @@ class _CustomDatePickerState extends ConsumerState<CustomDatePicker> {
       case 11:
         return "Nov";
       case 12:
-        return "Dec";
+        return "Dic";
 
       default:
         return "";
