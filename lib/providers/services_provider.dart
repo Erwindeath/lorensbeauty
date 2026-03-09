@@ -13,7 +13,7 @@ class ServiceCategory {
   final String colorHex;
   final int displayOrder;
   final bool isActive;
-  final int serviceCount; 
+  final int servicesCount;
   ServiceCategory({
     required this.id,
     required this.name,
@@ -22,7 +22,7 @@ class ServiceCategory {
     this.colorHex = '#721c80',
     this.displayOrder = 0,
     this.isActive = true,
-    this.serviceCount = 0,
+    this.servicesCount = 0,
   });
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) {
@@ -34,7 +34,7 @@ class ServiceCategory {
       colorHex: json['color_hex'] as String? ?? '#721c80',
       displayOrder: json['display_order'] as int? ?? 0,
       isActive: json['is_active'] as bool? ?? true,
-      serviceCount: json['services_count'] as int? ?? 0,
+      servicesCount: json['services_count'] as int? ?? 0,
     );
   }
 
@@ -51,6 +51,32 @@ class ServiceCategory {
   }
 }
 
+class ServicePhoto {
+  final int id;
+  final int serviceId;
+  final String photoUrl;
+  final String? caption;
+  final DateTime uploadedAt;
+
+  ServicePhoto({
+    required this.id,
+    required this.serviceId,
+    required this.photoUrl,
+    this.caption,
+    required this.uploadedAt,
+  });
+
+  factory ServicePhoto.fromJson(Map<String, dynamic> json) {
+    return ServicePhoto(
+      id: json['id'] as int,
+      serviceId: json['service_id'] as int,
+      photoUrl: json['photo_url'] as String,
+      caption: json['caption'] as String?,
+      uploadedAt: DateTime.parse(json['uploaded_at'] as String),
+    );
+  }
+}
+
 class Service {
   final int id;
   final int? categoryId;
@@ -60,6 +86,8 @@ class Service {
   final int durationMinutes;
   final String? img;
   final bool isActive;
+  final String? categoryName;
+  final List<ServicePhoto> photos;
 
   Service({
     required this.id,
@@ -70,9 +98,18 @@ class Service {
     required this.durationMinutes,
     this.img,
     this.isActive = true,
+    this.categoryName,
+    this.photos = const [],
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
+    List<ServicePhoto> photosList = [];
+    if (json['photos'] != null) {
+      photosList = (json['photos'] as List)
+          .map((photoJson) => ServicePhoto.fromJson(photoJson))
+          .toList();
+    }
+
     return Service(
       id: json['id'] as int,
       categoryId: json['category_id'] as int?,
@@ -82,6 +119,8 @@ class Service {
       durationMinutes: json['duration_minutes'] as int? ?? 30,
       img: json['img'] as String?,
       isActive: json['is_active'] as bool? ?? true,
+      categoryName: json['category_name'] as String?,
+      photos: photosList,
     );
   }
 
@@ -113,6 +152,10 @@ class Service {
     }
     return '$hours h ${minutes}min';
   }
+
+  // Helpers para fotos
+  bool get hasPhotos => photos.isNotEmpty;
+  String get firstPhotoUrl => hasPhotos ? photos.first.photoUrl : '';
 }
 
 // ============================================
