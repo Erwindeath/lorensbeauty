@@ -11,18 +11,30 @@ import 'package:lorensbeauty/screens/products/products_home_screen.dart';
 import 'package:lorensbeauty/screens/admin/products/products_management_screen.dart';
 import 'package:lorensbeauty/screens/profile/profile_screen.dart';
 import 'package:lorensbeauty/components/role_based_navigation_admin.dart';
+import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Widget principal que determina la navegación según el rol del usuario
 class RoleBasedNavigation extends ConsumerWidget {
-  const RoleBasedNavigation({Key? key}) : super(key: key);
+  final int initialClientTab;
+
+  const RoleBasedNavigation({Key? key, this.initialClientTab = 0}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) {
+      return const OnBoardingScreen();
+    }
+
     final profileAsync = ref.watch(userProfileProvider);
 
     return profileAsync.when(
       data: (profile) {
-        final role = profile?['role'] ?? 'client';
+        final role = profile?['role'];
+        if (role == null) {
+          return const OnBoardingScreen();
+        }
 
         // Navegación según rol
         switch (role) {
@@ -32,7 +44,7 @@ class RoleBasedNavigation extends ConsumerWidget {
             return const EmployeeBottomNavigation();
           case 'client':
           default:
-            return const ClientBottomNavigation();
+            return ClientBottomNavigation(initialIndex: initialClientTab);
         }
       },
       loading: () => Scaffold(
@@ -56,7 +68,7 @@ class RoleBasedNavigation extends ConsumerWidget {
           ),
         ),
       ),
-      error: (error, stack) => const ClientBottomNavigation(),
+      error: (error, stack) => const OnBoardingScreen(),
     );
   }
 }
@@ -65,14 +77,22 @@ class RoleBasedNavigation extends ConsumerWidget {
 // NAVEGACIÓN PARA CLIENTES
 // ============================================
 class ClientBottomNavigation extends StatefulWidget {
-  const ClientBottomNavigation({Key? key}) : super(key: key);
+  final int initialIndex;
+
+  const ClientBottomNavigation({Key? key, this.initialIndex = 0}) : super(key: key);
 
   @override
   State<ClientBottomNavigation> createState() => _ClientBottomNavigationState();
 }
 
 class _ClientBottomNavigationState extends State<ClientBottomNavigation> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   void navigateToBooking() {
     setState(() => _selectedIndex = 1);
@@ -185,13 +205,18 @@ class AdminBottomNavigation extends StatefulWidget {
 class _AdminBottomNavigationState extends State<AdminBottomNavigation> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const AdminDashboardScreen(), // Dashboard con estadísticas
-    const ProductsManagementScreen(), // Gestión de Productos
-    const ServicesManagementScreen(), // Gestión de Servicios
-    const OrderManagementPlaceholder(), // Gestión de Órdenes
-    const AdminSettingsScreen(), // Ajustes (Empleados, Promociones, Categorías)
-  ];
+  List<Widget> get _screens => [
+        AdminDashboardScreen(
+          onNavigateToTab: (index) {
+            if (!mounted) return;
+            setState(() => _selectedIndex = index);
+          },
+        ),
+        const ProductsManagementScreen(),
+        const ServicesManagementScreen(),
+        const AdminOrdersScreen(),
+        const AdminSettingsScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {

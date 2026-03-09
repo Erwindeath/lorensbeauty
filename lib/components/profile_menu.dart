@@ -13,7 +13,8 @@ class CardAdmin extends StatelessWidget {
   final Widget? userMoreInfo;
   final ImageProvider userProfilePic;
 
-  const CardAdmin({Key? key, 
+  const CardAdmin({
+    Key? key,
     this.backgroundColor,
     this.settingColor,
     this.cardRadius = 30,
@@ -170,7 +171,7 @@ List<MenuItem> adminMenuItems(BuildContext context) {
       title: 'Cerrar Sesión',
       trailingIcon: Icons.arrow_forward_ios_outlined,
       onTap: () async {
-        await Authentication.signOut(context: context);
+        await Authentication.signOut();
         await Provider.of<UserProvider>(context, listen: false).fetchUser();
       },
     ),

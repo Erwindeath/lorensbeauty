@@ -15,21 +15,17 @@ class BookingScreenNew extends ConsumerStatefulWidget {
 }
 
 class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
-  // Paso actual: 0 = categoría, 1 = servicios
-  int _currentStep = 0;
+  // Categoria seleccionada en el filtro
+  int? _selectedCategoryId;
+  String _serviceSearchQuery = '';
+  bool _hideScheduleFab = false;
+  final TextEditingController _serviceSearchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _scheduleSectionKey = GlobalKey();
 
-  // Horarios disponibles
-  final List<String> timeSlots = [
-    "09:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "02:00 PM",
-    "03:00 PM",
-    "04:00 PM",
-    "05:00 PM",
-    "06:00 PM",
-  ];
+  // Horarios disponibles segun configuracion admin (store_booking_slots)
+  List<String> _availableTimeSlots = const [];
+  bool _loadingTimeSlots = true;
 
   int selectedTimeIndex = -1;
 
@@ -38,9 +34,10 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
     try {
       final response = await Supabase.instance.client
           .from('services_photos')
-          .select('photo_url')
+          .select('photo_url, uploaded_at, id')
           .eq('service_id', serviceId)
-          .order('display_order');
+          .order('uploaded_at')
+          .order('id');
 
       return (response as List)
           .map((photo) => photo['photo_url'] as String)
@@ -53,326 +50,350 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
   @override
   void initState() {
     super.initState();
-    // Si ya hay una categoría seleccionada (viene del Home), ir directo a paso 1
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final selectedCategory = ref.read(selectedCategoryProvider);
-      if (selectedCategory != null && _currentStep == 0) {
-        setState(() => _currentStep = 1);
-      }
-    });
+    final selectedCategory = ref.read(selectedCategoryProvider);
+    _selectedCategoryId = selectedCategory?.id;
+    ref.read(selectedCategoryProvider.notifier).state = null;
+    _loadTimeSlotsForDate(ref.read(selectedBookingDateProvider));
+  }
+
+  @override
+  void dispose() {
+    _serviceSearchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedCategory = ref.watch(selectedCategoryProvider);
+    ref.listen<DateTime>(selectedBookingDateProvider, (previous, next) {
+      if (previous == null ||
+          previous.year != next.year ||
+          previous.month != next.month ||
+          previous.day != next.day) {
+        _loadTimeSlotsForDate(next);
+      }
+    });
+
     final selectedServices = ref.watch(selectedServicesProvider);
     final totalPrice = ref.watch(formattedTotalProvider);
     final totalDuration = ref.watch(formattedDurationProvider);
+    final categoriesAsync = ref.watch(serviceCategoriesProvider);
+    final servicesAsync = ref.watch(allServicesProvider);
+
+    if (selectedServices.isEmpty && _hideScheduleFab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _hideScheduleFab = false);
+        }
+      });
+    }
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Header con degradado
-            Container(
-              constraints: BoxConstraints(
-                minHeight: 200,
-                maxHeight: MediaQuery.of(context).size.height * 0.35,
+      floatingActionButton: selectedServices.isNotEmpty && !_hideScheduleFab
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                setState(() => _hideScheduleFab = true);
+                final targetContext = _scheduleSectionKey.currentContext;
+                if (targetContext != null) {
+                  await Scrollable.ensureVisible(
+                    targetContext,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              backgroundColor: const Color(0xff721c80),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.schedule),
+              label: const Text('Continuar con horario'),
+            )
+          : null,
+      body: Column(
+        children: [
+          Container(
+            constraints: BoxConstraints(
+              minHeight: 200,
+              maxHeight: MediaQuery.of(context).size.height * 0.35,
+            ),
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xff721c80),
+                  Color.fromARGB(255, 196, 103, 169),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xff721c80),
-                    Color.fromARGB(255, 196, 103, 169),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top + 10,
-                  left: 18,
-                  right: 18,
-                  bottom: 15,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        // Botón de retroceder
-                        if (_currentStep == 1 || selectedCategory != null)
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () {
-                              if (_currentStep == 1) {
-                                setState(() => _currentStep = 0);
-                              } else {
-                                ref.read(selectedCategoryProvider.notifier).state = null;
-                                ref.read(selectedServicesProvider.notifier).state = [];
-                              }
-                            },
-                          )
-                        else
-                          const SizedBox(width: 48),
-                        const Spacer(),
-                        Text(
-                          _currentStep == 0
-                              ? "Selecciona Categoría"
-                              : "Selecciona Servicios",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            letterSpacing: 1.1,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        const SizedBox(width: 48),
-                      ],
-                    ),
-                    const CustomDatePicker(),
-                  ],
-                ),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
               ),
             ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 10,
+                left: 18,
+                right: 18,
+                bottom: 15,
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // PASO 0: Seleccionar Categoría
-                  if (_currentStep == 0) _buildCategorySelection(),
-
-                  // PASO 1: Seleccionar Servicios
-                  if (_currentStep == 1) _buildServiceSelection(),
-
-                  const SizedBox(height: 20),
-
-                  // Horarios disponibles (solo si hay servicios seleccionados)
-                  if (selectedServices.isNotEmpty) ...[
-                    const Text(
-                      "Horarios disponibles",
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 45, 42, 42),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Row(
+                    children: [
+                      Spacer(),
+                      Text(
+                        'Reserva tu momento',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          letterSpacing: 1.1,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      Spacer(),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Elige tu experiencia y asegura tu cupo en minutos',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 15),
-                    _buildTimeSlots(),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // Resumen de la reserva
-                  if (selectedServices.isNotEmpty) _buildSummary(totalPrice, totalDuration),
-
-                  const SizedBox(height: 16),
-
-                  // Botón de confirmar reserva
-                  if (selectedServices.isNotEmpty)
-                    _buildConfirmButton(context, selectedServices, selectedTimeIndex),
+                  ),
+                  SizedBox(height: 10),
+                  CustomDatePicker(),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Construir selección de categorías
-  Widget _buildCategorySelection() {
-    final categoriesAsync = ref.watch(serviceCategoriesProvider);
-
-    return categoriesAsync.when(
-      data: (categories) {
-        if (categories.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(40),
-              child: Text('No hay categorías disponibles'),
-            ),
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Categorías de Servicios",
-              style: TextStyle(
-                color: Color.fromARGB(255, 45, 42, 42),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 1.2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-              ),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                return _buildCategoryCard(category);
-              },
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(color: Color(0xff721c80)),
-        ),
-      ),
-      error: (error, stack) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Text('Error: $error'),
-        ),
-      ),
-    );
-  }
-
-  // Card de categoría
-  Widget _buildCategoryCard(ServiceCategory category) {
-    final color = _parseColor(category.colorHex);
-
-    return GestureDetector(
-      onTap: () {
-        ref.read(selectedCategoryProvider.notifier).state = category;
-        setState(() => _currentStep = 1);
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color, color.withOpacity(0.7)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _getIconData(category.iconName),
-              size: 48,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              category.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Construir selección de servicios
-  Widget _buildServiceSelection() {
-    final selectedCategory = ref.watch(selectedCategoryProvider);
-    if (selectedCategory == null) return const SizedBox.shrink();
-
-    final servicesAsync = ref.watch(servicesByCategoryProvider(selectedCategory.id));
-
-    return servicesAsync.when(
-      data: (services) {
-        if (services.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(40),
-              child: Text('No hay servicios en esta categoría'),
-            ),
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _parseColor(selectedCategory.colorHex).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Categoría: ${selectedCategory.name}',
-                style: TextStyle(
-                  color: _parseColor(selectedCategory.colorHex),
-                  fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: _buildFixedFilters(categoriesAsync, servicesAsync),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildServiceSelection(servicesAsync),
+                    const SizedBox(height: 20),
+                    if (selectedServices.isNotEmpty) ...[
+                      Container(
+                        key: _scheduleSectionKey,
+                        child: const Text(
+                          'Selecciona la hora perfecta',
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 45, 42, 42),
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      _buildTimeSlots(),
+                      const SizedBox(height: 20),
+                    ],
+                    if (selectedServices.isNotEmpty) _buildSummary(totalPrice, totalDuration),
+                    const SizedBox(height: 20),
+                    if (selectedServices.isNotEmpty)
+                      _buildConfirmButton(context, selectedServices),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 15),
-            const Text(
-              "Selecciona uno o más servicios",
-              style: TextStyle(
-                color: Color.fromARGB(255, 45, 42, 42),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 15),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: services.length,
-              itemBuilder: (context, index) {
-                final service = services[index];
-                final isSelected = ref.watch(selectedServicesProvider).any((s) => s.id == service.id);
-                return _buildServiceCard(service, isSelected);
-              },
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(color: Color(0xff721c80)),
-        ),
-      ),
-      error: (error, stack) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Text('Error: $error'),
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // Card de servicio con botón de info
-  Widget _buildServiceCard(Service service, bool isSelected) {
+    // Filtros fijos (categoria + busqueda condicional)
+  Widget _buildFixedFilters(
+    AsyncValue<List<ServiceCategory>> categoriesAsync,
+    AsyncValue<List<Service>> servicesAsync,
+  ) {
+    final showSearch = servicesAsync.maybeWhen(
+      data: (services) {
+        final filteredByCategory = services
+            .where((s) => _selectedCategoryId == null || s.categoryId == _selectedCategoryId)
+            .toList();
+        return filteredByCategory.length > 10;
+      },
+      orElse: () => false,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        categoriesAsync.when(
+          data: (categories) {
+            final selectedExists = _selectedCategoryId == null
+                ? true
+                : categories.any((c) => c.id == _selectedCategoryId);
+            final dropdownValue = selectedExists ? _selectedCategoryId : null;
+
+            return DropdownButtonFormField<int?>(
+              value: dropdownValue,
+              decoration: InputDecoration(
+                labelText: 'Tipo de servicio',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.grey.shade400),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                  borderSide: BorderSide(color: Color(0xff721c80), width: 1.4),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Ver todos los servicios'),
+                ),
+                ...categories.map(
+                  (cat) => DropdownMenuItem<int?>(
+                    value: cat.id,
+                    child: Text('${cat.name} (${cat.serviceCount})'),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedCategoryId = value;
+                  _serviceSearchQuery = '';
+                  _serviceSearchController.clear();
+                });
+              },
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(color: Color(0xff721c80)),
+          ),
+          error: (error, _) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Error cargando categorias: $error'),
+          ),
+        ),
+        if (showSearch) ...[
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _serviceSearchController,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search, color: Color(0xff721c80)),
+                hintText: 'Buscar servicio por nombre...',
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                suffixIcon: _serviceSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _serviceSearchController.clear();
+                            _serviceSearchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+              onChanged: (value) {
+                setState(() => _serviceSearchQuery = value);
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Lista de servicios (scroll)
+  Widget _buildServiceSelection(AsyncValue<List<Service>> servicesAsync) {
+    final photoMap = ref.watch(servicePrimaryPhotosProvider).maybeWhen(
+          data: (map) => map,
+          orElse: () => const <int, String>{},
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '¿Que servicio te vas a consentir hoy?',
+          style: TextStyle(
+            color: Color.fromARGB(255, 45, 42, 42),
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        servicesAsync.when(
+          data: (services) {
+            final filteredByCategory = services
+                .where((s) => _selectedCategoryId == null || s.categoryId == _selectedCategoryId)
+                .toList();
+            final query = _serviceSearchQuery.trim().toLowerCase();
+            final filtered = query.isEmpty
+                ? filteredByCategory
+                : filteredByCategory.where((s) => s.name.toLowerCase().contains(query)).toList();
+
+            if (filtered.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: Text('No hay servicios disponibles en esta categoria por ahora')),
+              );
+            }
+
+            return ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final service = filtered[index];
+                final isSelected = ref.watch(selectedServicesProvider).any((s) => s.id == service.id);
+                final thumbnailUrl = photoMap[service.id] ?? service.img;
+                return _buildServiceCard(service, isSelected, thumbnailUrl);
+              },
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(child: CircularProgressIndicator(color: Color(0xff721c80))),
+          ),
+          error: (error, _) => Padding(
+            padding: const EdgeInsets.all(40),
+            child: Center(child: Text('Error: $error')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Card de servicio con boton de info
+  Widget _buildServiceCard(Service service, bool isSelected, String? thumbnailUrl) {
     return GestureDetector(
       onTap: () {
         toggleServiceSelection(ref, service);
@@ -388,72 +409,86 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
             width: isSelected ? 2 : 1,
           ),
         ),
-        child: Stack(
+        child: Row(
           children: [
-            Row(
-              children: [
-                // Checkbox
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xff721c80) : Colors.white,
-                    border: Border.all(
-                      color: isSelected ? const Color(0xff721c80) : Colors.grey.shade400,
-                      width: 2,
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xff721c80) : Colors.white,
+                border: Border.all(
+                  color: isSelected ? const Color(0xff721c80) : Colors.grey.shade400,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+            ),
+            const SizedBox(width: 12),
+            _buildServiceThumb(thumbnailUrl),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    service.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: isSelected
-                      ? const Icon(Icons.check, size: 16, color: Colors.white)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                // Info del servicio
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 30),
-                        child: Text(
-                          service.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xff721c80).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      service.formattedDuration,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xff721c80),
+                        fontWeight: FontWeight.w600,
                       ),
-                      if (service.description != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          service.description!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            service.formattedDuration,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
+                    ),
+                  ),
+                  if (service.description != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      service.description!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
                       ),
-                    ],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () => _showServiceInfoModal(service),
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xff721c80).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xff721c80),
+                    ),
                   ),
                 ),
-                // Precio
+                const SizedBox(height: 8),
                 Text(
                   service.formattedPrice,
                   style: const TextStyle(
@@ -464,40 +499,46 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                 ),
               ],
             ),
-            // Botón de información (ícono !) en la esquina superior derecha
-            Positioned(
-              top: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: () => _showServiceInfoModal(service),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff721c80).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.info_outline,
-                    size: 18,
-                    color: Color(0xff721c80),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  // Modal para mostrar información detallada del servicio
+  Widget _buildServiceThumb(String? photoUrl) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 48,
+        height: 48,
+        color: Colors.grey.shade200,
+        child: (photoUrl != null && photoUrl.isNotEmpty)
+            ? CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => const Icon(
+                  Icons.spa,
+                  color: Color(0xff721c80),
+                  size: 22,
+                ),
+              )
+            : const Icon(
+                Icons.spa,
+                color: Color(0xff721c80),
+                size: 22,
+              ),
+      ),
+    );
+  }
+
+  // Modal para mostrar informacion detallada del servicio
   void _showServiceInfoModal(Service service) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
+        initialChildSize: 0.78,
         minChildSize: 0.5,
         maxChildSize: 0.95,
         builder: (_, controller) => Container(
@@ -509,12 +550,16 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
             future: _fetchServicePhotos(service.id),
             builder: (context, snapshot) {
               final photos = snapshot.data ?? [];
+              final photoUrls = photos.isNotEmpty
+                  ? photos
+                  : ((service.img != null && service.img!.isNotEmpty)
+                      ? <String>[service.img!]
+                      : <String>[]);
 
               return ListView(
                 controller: controller,
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // Indicador de arrastre
                   Center(
                     child: Container(
                       width: 40,
@@ -526,72 +571,112 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                       ),
                     ),
                   ),
-
-                  // Galería de fotos
-                  if (photos.isNotEmpty) ...[
-                    SizedBox(
-                      height: 250,
-                      child: PageView.builder(
-                        itemCount: photos.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: ClipRRect(
+                  if (photoUrls.isNotEmpty) ...[
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: SizedBox(
+                        height: 260,
+                        child: PageView.builder(
+                          itemCount: photoUrls.length,
+                          itemBuilder: (context, index) {
+                            return ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: CachedNetworkImage(
-                                imageUrl: photos[index],
-                                height: 250,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: Colors.grey.shade200,
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xff721c80),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  CachedNetworkImage(
+                                    imageUrl: photoUrls[index],
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                      color: Colors.grey.shade200,
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Color(0xff721c80),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(Icons.image_not_supported, size: 50),
                                     ),
                                   ),
-                                ),
-                                errorWidget: (_, __, ___) => Container(
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(
-                                    Icons.image_not_supported,
-                                    size: 50,
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withOpacity(0.42),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  Positioned(
+                                    left: 12,
+                                    bottom: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.92),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Text(
+                                        '${index + 1}/${photoUrls.length}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xff721c80),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                    if (photos.length > 1) ...[
+                    if (photoUrls.length > 1) ...[
                       const SizedBox(height: 10),
-                      Center(
-                        child: Text(
-                          '${photos.length} fotos - Desliza para ver más',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
+                      SizedBox(
+                        height: 56,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: photoUrls.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: CachedNetworkImage(
+                                imageUrl: photoUrls[index],
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => Container(
+                                  width: 56,
+                                  height: 56,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.image_not_supported, size: 16),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
-                    const SizedBox(height: 20),
-                  ] else if (service.img != null) ...[
-                    // Si no hay fotos en services_photos pero hay img en service
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: CachedNetworkImage(
-                        imageUrl: service.img!,
-                        height: 250,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
                   ],
-
-                  // Nombre del servicio
                   Text(
                     service.name,
                     style: const TextStyle(
@@ -601,8 +686,6 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                     ),
                   ),
                   const SizedBox(height: 15),
-
-                  // Detalles (precio y duración)
                   Row(
                     children: [
                       Container(
@@ -649,29 +732,48 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Descripción completa
                   if (service.description != null) ...[
-                    const Text(
-                      'Descripción',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xff721c80).withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xff721c80).withOpacity(0.18),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      service.description!,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade700,
-                        height: 1.6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.auto_awesome, size: 18, color: Color(0xff721c80)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Descripcion del servicio',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff721c80),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            service.description!,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Colors.grey.shade800,
+                              height: 1.55,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
                   ],
-
-                  // Botón para cerrar
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
@@ -701,11 +803,36 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
 
   // Construir horarios
   Widget _buildTimeSlots() {
+    if (_loadingTimeSlots) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: CircularProgressIndicator(color: Color(0xff721c80)),
+        ),
+      );
+    }
+
+    if (_availableTimeSlots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Text(
+          'No hay horarios disponibles para este dia.',
+          style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: List.generate(
-        timeSlots.length,
+        _availableTimeSlots.length,
         (index) => GestureDetector(
           onTap: () => setState(() => selectedTimeIndex = index),
           child: Container(
@@ -719,7 +846,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
               ),
             ),
             child: Text(
-              timeSlots[index],
+              _availableTimeSlots[index],
               style: TextStyle(
                 color: selectedTimeIndex == index ? Colors.white : Colors.black87,
                 fontWeight: selectedTimeIndex == index ? FontWeight.bold : FontWeight.normal,
@@ -812,11 +939,15 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
   Widget _buildConfirmButton(
     BuildContext context,
     List<Service> selectedServices,
-    int selectedTimeIndex,
   ) {
     return GestureDetector(
       onTap: () async {
-        if (selectedTimeIndex < 0) {
+        final selectedSlot =
+            (selectedTimeIndex >= 0 && selectedTimeIndex < _availableTimeSlots.length)
+                ? _availableTimeSlots[selectedTimeIndex]
+                : null;
+
+        if (selectedSlot == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Por favor selecciona un horario'),
@@ -830,9 +961,9 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Confirmar Reserva'),
+            title: const Text('Finalizar reserva'),
             content: Text(
-              '¿Confirmas tu reserva para ${timeSlots[selectedTimeIndex]}?\n\n'
+              '¿Confirmas tu reserva para $selectedSlot?\n\n'
               'Servicios: ${selectedServices.length}\n'
               'Total: ${ref.read(formattedTotalProvider)}',
             ),
@@ -878,7 +1009,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
             final selectedDate = ref.read(selectedBookingDateProvider);
 
             // Convertir hora seleccionada a formato TIME (HH:mm:ss)
-            final timeSlot = timeSlots[selectedTimeIndex];
+            final timeSlot = selectedSlot;
             final timeParts = _parseTimeSlot(timeSlot);
 
             // Calcular totales
@@ -926,8 +1057,8 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
               // Resetear todo
               clearSelectedServices(ref);
               setState(() {
-                _currentStep = 0;
                 selectedTimeIndex = -1;
+                _hideScheduleFab = false;
               });
             } else {
               // Error al crear orden
@@ -980,7 +1111,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
         ),
         child: const Center(
           child: Text(
-            "Confirmar Reserva",
+            "Reservar ahora",
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -1018,33 +1149,76 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
     }
   }
 
-  // Helper para parsear colores
-  Color _parseColor(String hexColor) {
+  Future<void> _loadTimeSlotsForDate(DateTime date) async {
+    setState(() {
+      _loadingTimeSlots = true;
+      selectedTimeIndex = -1;
+    });
+
     try {
-      final hex = hexColor.replaceAll('#', '');
-      return Color(int.parse('FF$hex', radix: 16));
-    } catch (e) {
-      return const Color(0xff721c80); // Color por defecto
+      final rows = await Supabase.instance.client
+          .from('store_booking_slots')
+          .select('slot_time')
+          .eq('weekday', date.weekday)
+          .order('slot_time');
+
+      final slots = (rows as List)
+          .map((r) => r['slot_time']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .map(_formatSlotForDisplay)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _availableTimeSlots = slots;
+        _loadingTimeSlots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _availableTimeSlots = const [];
+        _loadingTimeSlots = false;
+      });
     }
   }
 
-  // Helper para íconos
-  IconData _getIconData(String? iconName) {
-    switch (iconName) {
-      case 'face':
-        return Icons.face;
-      case 'spa':
-        return Icons.spa;
-      case 'self_improvement':
-        return Icons.self_improvement;
-      case 'mood':
-        return Icons.mood;
-      case 'brush':
-        return Icons.brush;
-      case 'content_cut':
-        return Icons.content_cut;
-      default:
-        return Icons.spa;
+  String _formatSlotForDisplay(String raw) {
+    final normalized = _normalizeDbTime(raw);
+    final parts = normalized.split(':');
+    if (parts.length < 2) return normalized;
+
+    var hour = int.tryParse(parts[0]) ?? 0;
+    final minute = parts[1].padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    if (hour == 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
     }
+    return '${hour.toString().padLeft(2, '0')}:$minute $period';
+  }
+
+  String _normalizeDbTime(String raw) {
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final h = parts[0].padLeft(2, '0');
+    final m = parts[1].padLeft(2, '0');
+    return '$h:$m';
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

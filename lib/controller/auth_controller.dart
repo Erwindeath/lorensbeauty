@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:lorensbeauty/screens/introduction/onboarding_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Authentication {
@@ -45,16 +44,11 @@ class Authentication {
     }
   }
 
-  static Future<void> signOut({required BuildContext context}) async {
+  static Future<void> signOut() async {
     final GoogleSignIn googleSignIn = GoogleSignIn();
-    Supabase.instance.client.auth.signOut();
+    await Supabase.instance.client.auth.signOut();
 
     await googleSignIn.signOut();
-    await Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const OnBoardingScreen()),
-    );
-    print("Sesión cerrada exitosamente.");
   }
 
   // ============================================
@@ -135,7 +129,10 @@ class Authentication {
   /// Recuperar contraseña
   static Future<bool> resetPassword({required String email}) async {
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'io.supabase.lorensbeauty://login-callback/',
+      );
       print("Email de recuperación enviado a: $email");
       return true;
     } catch (e) {
@@ -157,8 +154,12 @@ class Authentication {
     String? phone,
   }) async {
     try {
+      final auth = Supabase.instance.client.auth;
+      final previousSession = auth.currentSession;
+      final previousUserId = auth.currentUser?.id;
+
       // Crear usuario en auth.users
-      final response = await Supabase.instance.client.auth.signUp(
+      final response = await auth.signUp(
         email: email,
         password: password,
         data: {
@@ -172,6 +173,12 @@ class Authentication {
           'role': 'employee',
           'phone': phone,
         }).eq('id', response.user!.id);
+
+        // Evitar que el admin quede logueado como el empleado creado.
+        if (previousSession?.refreshToken != null &&
+            auth.currentUser?.id != previousUserId) {
+          await auth.setSession(previousSession!.refreshToken!);
+        }
 
         print("Empleado creado exitosamente: ${response.user!.email}");
       }
@@ -264,7 +271,7 @@ class Authentication {
     return user;
   }
 
-  static Future<void> signOut({required BuildContext context}) async {
+  static Future<void> signOut() async {
     final GoogleSignIn googleSignIn = GoogleSignIn();
 
     try {
@@ -277,3 +284,4 @@ class Authentication {
     }
   }
 }*/
+

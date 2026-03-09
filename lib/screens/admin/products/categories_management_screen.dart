@@ -50,6 +50,7 @@ class _CategoriesManagementScreenState
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCategoryDialog(null),
         backgroundColor: const Color(0xff721c80),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Nueva Categoría'),
       ),
@@ -229,6 +230,7 @@ class _CategoriesManagementScreenState
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff721c80),
+                foregroundColor: Colors.white,
               ),
               child: const Text('Guardar'),
             ),
@@ -306,7 +308,10 @@ class _CategoriesManagementScreenState
               await _deleteCategory(category.id);
               if (context.mounted) Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Eliminar'),
           ),
         ],
@@ -372,3 +377,4 @@ class _CategoriesManagementScreenState
     }
   }
 }
+

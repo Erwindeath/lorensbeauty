@@ -280,8 +280,7 @@ final allProductsProvider = FutureProvider<List<Product>>((ref) async {
           categories(name)
         ''')
         .eq('active', true)
-        .order('created_at', ascending: false)
-        .limit(100);
+        .order('created_at', ascending: false);
 
     List<Product> products = [];
     for (var productJson in response) {

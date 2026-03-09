@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../providers/orders_provider.dart';
 
 class QRScannerScreen extends ConsumerStatefulWidget {
@@ -12,7 +13,7 @@ class QRScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
-  MobileScannerController cameraController = MobileScannerController();
+  final MobileScannerController cameraController = MobileScannerController();
   bool _isProcessing = false;
 
   @override
@@ -23,22 +24,16 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
+    final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
 
-    final String? code = barcodes.first.rawValue;
+    final code = barcodes.first.rawValue;
     if (code == null) return;
 
-    setState(() {
-      _isProcessing = true;
-    });
+    setState(() => _isProcessing = true);
 
     try {
-      // El QR contiene el ID de la orden
       final orderId = int.parse(code);
-
-      // Obtener la orden
       final orderData = await Supabase.instance.client
           .from('orders')
           .select()
@@ -53,41 +48,29 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
       orderData['order_services'] = servicesData;
       final order = Order.fromJson(orderData);
 
-      setState(() {
-        _isProcessing = false;
-      });
-
-      // Pausar la cámara
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
       cameraController.stop();
 
-      // Mostrar modal con información de la orden
-      _showOrderModal(order);
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _OrderActionModal(
+          order: order,
+          onClosed: () => cameraController.start(),
+        ),
+      );
     } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al escanear QR: ${e.toString()}'),
+          content: Text('Error al escanear QR: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
-  }
-
-  void _showOrderModal(Order order) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _OrderActionModal(
-        order: order,
-        onAction: () {
-          cameraController.start();
-        },
-      ),
-    );
   }
 
   @override
@@ -95,7 +78,8 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Escanear QR'),
-        backgroundColor: const Color(0xFFB8860B),
+        backgroundColor: const Color(0xff721c80),
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: Icon(cameraController.torchEnabled ? Icons.flash_on : Icons.flash_off),
@@ -106,67 +90,48 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.flip_camera_ios),
-            onPressed: () {
-              cameraController.switchCamera();
-            },
+            onPressed: cameraController.switchCamera,
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Cámara escáner
           MobileScanner(
             controller: cameraController,
             onDetect: _onDetect,
           ),
-
-          // Overlay con guía de escaneo
           Center(
             child: Container(
-              width: 250,
-              height: 250,
+              width: 255,
+              height: 255,
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.white,
-                  width: 3,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white, width: 3),
               ),
             ),
           ),
-
-          // Instrucciones
           Positioned(
-            top: 40,
-            left: 0,
-            right: 0,
+            top: 34,
+            left: 16,
+            right: 16,
             child: Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withOpacity(0.55),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'Apunta la cámara al código QR del cliente',
+                'Escanea el QR del cliente para gestionar sus servicios',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ),
           ),
-
-          // Loading indicator
           if (_isProcessing)
             Container(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withOpacity(0.4),
               child: const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFB8860B),
-                ),
+                child: CircularProgressIndicator(color: Color(0xff721c80)),
               ),
             ),
         ],
@@ -177,11 +142,11 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
 
 class _OrderActionModal extends StatefulWidget {
   final Order order;
-  final VoidCallback onAction;
+  final VoidCallback onClosed;
 
   const _OrderActionModal({
     required this.order,
-    required this.onAction,
+    required this.onClosed,
   });
 
   @override
@@ -189,398 +154,319 @@ class _OrderActionModal extends StatefulWidget {
 }
 
 class _OrderActionModalState extends State<_OrderActionModal> {
-  bool _isLoading = false;
+  bool _loading = false;
+  late final String? _employeeId;
+  late final List<OrderService> _services;
+  final Set<int> _selectedServiceIds = {};
+  int _tapVersion = 0;
 
-  Future<void> _startOrder() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final employeeId = Supabase.instance.client.auth.currentUser?.id;
-      if (employeeId == null) {
-        throw Exception('No se pudo obtener el ID del empleado');
-      }
-
-      final success = await startOrder(widget.order.id, employeeId);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Servicio iniciado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-        widget.onAction();
-      } else {
-        throw Exception('No se pudo iniciar el servicio');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _employeeId = Supabase.instance.client.auth.currentUser?.id;
+    _services = List<OrderService>.from(widget.order.services);
+    if (_services.isNotEmpty) _selectedServiceIds.add(_services.first.id);
   }
 
-  Future<void> _completeOrder() async {
-    setState(() {
-      _isLoading = true;
-    });
+  List<OrderService> get _selectedServices =>
+      _services.where((s) => _selectedServiceIds.contains(s.id)).toList();
 
+  bool _isTakenByAnother(OrderService s) {
+    if (_employeeId == null) return false;
+    if (s.employeeId == null || s.employeeId!.isEmpty) return false;
+    if (s.status == 'pending' || s.status == 'confirmed') return false;
+    return s.employeeId != _employeeId;
+  }
+
+  bool _canComplete(OrderService s) {
+    if (s.status != 'in_progress') return false;
+    if (s.employeeId == null || _employeeId == null) return true;
+    return s.employeeId == _employeeId;
+  }
+
+  Future<void> _handleAction() async {
+    final selected = _selectedServices;
+    if (selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona al menos un servicio.')),
+      );
+      return;
+    }
+    if (_employeeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo obtener el empleado actual')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
     try {
-      final success = await completeOrder(widget.order.id);
+      int started = 0;
+      int completed = 0;
+      int skipped = 0;
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Servicio completado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-        widget.onAction();
-      } else {
-        throw Exception('No se pudo completar el servicio');
+      for (final s in selected) {
+        if (_isTakenByAnother(s)) {
+          skipped++;
+          continue;
+        }
+        bool ok;
+        if (_canComplete(s)) {
+          ok = await completeOrderService(
+            orderId: widget.order.id,
+            orderServiceId: s.id,
+            employeeId: _employeeId!,
+          );
+          if (ok) {
+            completed++;
+          }
+        } else {
+          ok = await startOrderService(
+            orderId: widget.order.id,
+            orderServiceId: s.id,
+            employeeId: _employeeId!,
+          );
+          if (ok) {
+            started++;
+          }
+        }
       }
-    } catch (e) {
+
+      if (started == 0 && completed == 0 && skipped > 0) {
+        throw Exception('Los servicios seleccionados estan bloqueados por otro empleado.');
+      }
+      if (started == 0 && completed == 0) {
+        throw Exception(
+          'No se pudo guardar el cambio de servicios. Verifica permisos/politicas en order_services.',
+        );
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          content: Text(
+            'Iniciados: $started • Completados: $completed'
+            '${skipped > 0 ? ' • Omitidos: $skipped' : ''}',
+          ),
+          backgroundColor: Colors.green,
         ),
       );
+      Navigator.of(context).pop();
+      widget.onClosed();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.7,
+      initialChildSize: 0.78,
       minChildSize: 0.5,
-      maxChildSize: 0.9,
+      maxChildSize: 0.95,
       builder: (_, controller) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
           controller: controller,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           children: [
-            // Indicador de arrastre
             Center(
               child: Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
+                margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-
-            // Estado
             Row(
               children: [
-                Text(
-                  widget.order.statusEmoji,
-                  style: const TextStyle(fontSize: 32),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xff721c80).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.receipt_long, color: Color(0xff721c80)),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.order.statusLabel,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Orden #${widget.order.id}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
                       ),
                       Text(
-                        'Orden #${widget.order.id}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        '${widget.order.formattedDate} - ${widget.order.formattedTime}',
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 24),
-
-            // Información de la cita
-            _buildInfoCard(
-              icon: Icons.calendar_today,
-              title: 'Fecha y Hora',
-              value: '${widget.order.formattedDate} • ${widget.order.formattedTime}',
-            ),
-
             const SizedBox(height: 16),
-
-            // Servicios
-            _buildServicesCard(),
-
-            const SizedBox(height: 16),
-
-            // Duración y Precio
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.access_time,
-                    title: 'Duración',
-                    value: widget.order.formattedDuration,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.attach_money,
-                    title: 'Total',
-                    value: widget.order.formattedPrice,
-                  ),
-                ),
-              ],
-            ),
-
-            if (widget.order.notes != null && widget.order.notes!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildInfoCard(
-                icon: Icons.note,
-                title: 'Notas',
-                value: widget.order.notes!,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xffF7F2FA),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xffE6D7F2)),
               ),
-            ],
-
-            const SizedBox(height: 24),
-
-            // Botones de acción
-            if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFB8860B),
+              child: const Text(
+                'Puedes seleccionar uno o varios servicios de esta orden.',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xff5C3A75)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            ..._services.map((s) {
+              final selected = _selectedServiceIds.contains(s.id);
+              final taken = _isTakenByAnother(s);
+              final statusColor = s.status == 'completed'
+                  ? Colors.green
+                  : s.status == 'in_progress'
+                      ? Colors.blue
+                      : Colors.grey;
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    if (selected) {
+                      _selectedServiceIds.remove(s.id);
+                    } else {
+                      _selectedServiceIds.add(s.id);
+                    }
+                    _tapVersion++;
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  key: ValueKey('svc_${s.id}_$_tapVersion'),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xff721c80).withOpacity(0.14)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected ? const Color(0xff721c80) : Colors.grey.shade300,
+                      width: selected ? 1.8 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        selected ? Icons.check_box : Icons.check_box_outline_blank,
+                        color: selected ? const Color(0xff721c80) : Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.serviceName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                if (selected)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xff721c80).withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'Seleccionado',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xff721c80),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    taken ? 'Tomado por otro empleado' : _serviceStatusLabel(s.status),
+                                    style: TextStyle(fontSize: 12, color: statusColor),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(s.formattedDuration, style: TextStyle(color: Colors.grey.shade600)),
+                    ],
+                  ),
                 ),
-              )
+              );
+            }),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Center(child: CircularProgressIndicator(color: Color(0xff721c80)))
             else
-              _buildActionButtons(),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed:
+                      widget.order.status == 'completed' || widget.order.status == 'cancelled'
+                          ? null
+                          : _handleAction,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    _selectedServiceIds.length > 1
+                        ? 'Procesar servicios seleccionados'
+                        : 'Procesar servicio seleccionado',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onClosed();
+              },
+              child: const Text('Cerrar'),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFFB8860B), size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServicesCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.spa, color: Color(0xFFB8860B), size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Servicios (${widget.order.services.length})',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...widget.order.services.map((service) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 36),
-                    Expanded(
-                      child: Text(
-                        service.serviceName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      service.formattedDuration,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    final status = widget.order.status;
-
-    if (status == 'confirmed') {
-      // Orden confirmada - puede iniciar servicio
-      return Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _startOrder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB8860B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Iniciar Servicio',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              widget.onAction();
-            },
-            child: const Text('Cancelar'),
-          ),
-        ],
-      );
-    } else if (status == 'in_progress') {
-      // Servicio en progreso - puede completar
-      return Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _completeOrder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Completar Servicio',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              widget.onAction();
-            },
-            child: const Text('Cerrar'),
-          ),
-        ],
-      );
-    } else {
-      // Orden completada o cancelada - solo mostrar información
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            widget.onAction();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[300],
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text(
-            'Cerrar',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-      );
+  String _serviceStatusLabel(String status) {
+    switch (status) {
+      case 'in_progress':
+        return 'En progreso';
+      case 'completed':
+        return 'Completado';
+      case 'pending':
+      case 'confirmed':
+      default:
+        return 'Pendiente';
     }
   }
 }

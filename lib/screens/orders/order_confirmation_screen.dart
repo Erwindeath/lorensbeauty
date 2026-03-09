@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lorensbeauty/components/role_based_navigation.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../providers/orders_provider.dart';
 
 class OrderConfirmationScreen extends StatelessWidget {
@@ -10,118 +12,125 @@ class OrderConfirmationScreen extends StatelessWidget {
     required this.order,
   }) : super(key: key);
 
+  void _goToRootTab(BuildContext context, int tabIndex) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => RoleBasedNavigation(initialClientTab: tabIndex),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xfff6f2f8),
       body: SafeArea(
         child: Column(
           children: [
-            // Header con ícono de éxito
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xff721c80),
-                    Color.fromARGB(255, 196, 103, 169),
-                  ],
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xff721c80), Color.fromARGB(255, 196, 103, 169)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(26),
+                  bottomRight: Radius.circular(26),
                 ),
               ),
               child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                      size: 60,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SizedBox(width: 40),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, color: Colors.white, size: 30),
+                      ),
+                      IconButton(
+                        onPressed: () => _goToRootTab(context, 0),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   const Text(
-                    '¡Reserva Confirmada!',
+                    'Reserva confirmada',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     'Orden #${order.id}',
                     style: const TextStyle(
                       color: Colors.white70,
-                      fontSize: 16,
+                      fontSize: 15,
                     ),
                   ),
                 ],
               ),
             ),
-
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // QR Code
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: Column(
                         children: [
                           const Text(
-                            'Tu Código QR',
+                            'Tu codigo QR',
                             style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xff721c80),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           const Text(
-                            'Muestra este código al llegar',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            'Muestralo en recepcion al llegar',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: const Color(0xff721c80),
-                                width: 2,
+                                width: 1.7,
                               ),
                             ),
                             child: QrImageView(
                               data: order.qrData,
                               version: QrVersions.auto,
-                              size: 200,
+                              size: 190,
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
                             ),
@@ -129,113 +138,41 @@ class OrderConfirmationScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Detalles de la reserva
+                    const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[50],
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Detalles de la Reserva',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Fecha y hora
-                          _buildDetailRow(
-                            icon: Icons.calendar_today,
-                            label: 'Fecha',
-                            value: order.formattedDate,
+                            'Resumen de reserva',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 12),
-                          _buildDetailRow(
-                            icon: Icons.access_time,
-                            label: 'Hora',
-                            value: order.formattedTime,
-                          ),
+                          _buildDetailRow(icon: Icons.calendar_today, label: 'Fecha', value: order.formattedDate),
+                          const SizedBox(height: 10),
+                          _buildDetailRow(icon: Icons.access_time, label: 'Hora', value: order.formattedTime),
+                          const SizedBox(height: 10),
+                          _buildDetailRow(icon: Icons.timer, label: 'Duracion', value: order.formattedDuration),
                           const SizedBox(height: 12),
-                          _buildDetailRow(
-                            icon: Icons.timer,
-                            label: 'Duración',
-                            value: order.formattedDuration,
-                          ),
-
-                          const SizedBox(height: 20),
-                          const Divider(),
-                          const SizedBox(height: 12),
-
-                          // Servicios
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.spa,
-                                color: Color(0xff721c80),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Servicios (${order.services.length})',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ...order.services.map((service) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  children: [
-                                    const SizedBox(width: 28),
-                                    Expanded(
-                                      child: Text(
-                                        '• ${service.serviceName}',
-                                        style: const TextStyle(fontSize: 15),
-                                      ),
-                                    ),
-                                    Text(
-                                      service.formattedPrice,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xff721c80),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )),
-
-                          const SizedBox(height: 12),
-                          const Divider(),
-                          const SizedBox(height: 12),
-
-                          // Total
+                          const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
                                 'Total',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                               ),
                               Text(
                                 order.formattedPrice,
                                 style: const TextStyle(
                                   fontSize: 22,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w800,
                                   color: Color(0xff721c80),
                                 ),
                               ),
@@ -244,41 +181,22 @@ class OrderConfirmationScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Instrucciones
+                    const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: const Color(0xfff1f5ff),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: Colors.blue,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
+                          Icon(Icons.info_outline, color: Color(0xff2c4ca4), size: 20),
+                          SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Importante',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Al llegar, muestra este código QR al personal para iniciar tu servicio.',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ],
+                            child: Text(
+                              'Tip: abre Mis Reservas para ver estado, fecha y cambios de tu turno.',
+                              style: TextStyle(fontSize: 13, color: Color(0xff2c4ca4)),
                             ),
                           ),
                         ],
@@ -288,17 +206,15 @@ class OrderConfirmationScreen extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Botones de acción
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
-                    offset: const Offset(0, -5),
+                    offset: const Offset(0, -2),
                   ),
                 ],
               ),
@@ -306,56 +222,38 @@ class OrderConfirmationScreen extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: 54,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Navegar a Mis Órdenes
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/home',
-                          (route) => false,
-                        );
-                      },
+                      onPressed: () => _goToRootTab(context, 3),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff721c80),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: const Text(
                         'Ver Mis Reservas',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: 54,
                     child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/home',
-                          (route) => false,
-                        );
-                      },
+                      onPressed: () => _goToRootTab(context, 0),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color(0xff721c80),
-                          width: 2,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        side: const BorderSide(color: Color(0xff721c80), width: 1.7),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: const Text(
                         'Volver al Inicio',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xff721c80),
                         ),
                       ),
@@ -377,20 +275,17 @@ class OrderConfirmationScreen extends StatelessWidget {
   }) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xff721c80), size: 20),
+        Icon(icon, color: const Color(0xff721c80), size: 18),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: const TextStyle(
-            fontSize: 15,
-            color: Colors.grey,
-          ),
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

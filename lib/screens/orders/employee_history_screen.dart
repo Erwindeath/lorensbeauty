@@ -1,32 +1,42 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../providers/orders_provider.dart';
 
-/// Pantalla que muestra el historial de servicios realizados por el empleado
-class EmployeeHistoryScreen extends ConsumerWidget {
+class EmployeeHistoryScreen extends ConsumerStatefulWidget {
   const EmployeeHistoryScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final employeeId = Supabase.instance.client.auth.currentUser?.id;
+  ConsumerState<EmployeeHistoryScreen> createState() => _EmployeeHistoryScreenState();
+}
 
+class _EmployeeHistoryScreenState extends ConsumerState<EmployeeHistoryScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _periodFilter = 'all';
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final employeeId = Supabase.instance.client.auth.currentUser?.id;
     if (employeeId == null) {
       return const Scaffold(
-        body: Center(
-          child: Text('Error: No se pudo obtener el ID del empleado'),
-        ),
+        body: Center(child: Text('No se pudo obtener el empleado actual.')),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Mi Historial',
-          style: TextStyle(color: Colors.white),
-        ),
+        automaticallyImplyLeading: false,
+        title: const Text('Historial de Servicios'),
         backgroundColor: const Color(0xff721c80),
-        iconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: Supabase.instance.client
@@ -35,89 +45,38 @@ class EmployeeHistoryScreen extends ConsumerWidget {
             .eq('employee_id', employeeId)
             .order('created_at', ascending: false),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar historial',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            );
-          }
-
+          if (snapshot.hasError) return const Center(child: Text('Error cargando historial.'));
           if (!snapshot.hasData) {
             return const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xff721c80),
-              ),
+              child: CircularProgressIndicator(color: Color(0xff721c80)),
             );
           }
 
-          final ordersData = snapshot.data!;
-
-          if (ordersData.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history,
-                    size: 80,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No hay servicios realizados',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Los servicios que completes aparecerán aquí',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return FutureBuilder<List<Order>>(
-            future: _loadOrdersWithServices(ordersData),
-            builder: (context, orderSnapshot) {
-              if (!orderSnapshot.hasData) {
+          return FutureBuilder<List<_OrderWithClient>>(
+            future: _enrichOrders(snapshot.data!),
+            builder: (context, detailsSnapshot) {
+              if (!detailsSnapshot.hasData) {
                 return const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xff721c80),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xff721c80)),
                 );
               }
 
-              final orders = orderSnapshot.data!;
+              final all = detailsSnapshot.data!;
+              final filtered = _applyFilters(all);
 
-              return RefreshIndicator(
-                onRefresh: () async {
-                  // Trigger rebuild
-                  (context as Element).markNeedsBuild();
-                },
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return _buildOrderCard(context, order);
-                  },
-                ),
+              return Column(
+                children: [
+                  _buildFilters(all.length),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(child: Text('No hay resultados con estos filtros.'))
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) => _buildOrderCard(filtered[i]),
+                          ),
+                  ),
+                ],
               );
             },
           );
@@ -126,390 +85,96 @@ class EmployeeHistoryScreen extends ConsumerWidget {
     );
   }
 
-  Future<List<Order>> _loadOrdersWithServices(
-      List<Map<String, dynamic>> ordersData) async {
-    List<Order> orders = [];
-
-    for (var orderJson in ordersData) {
+  Future<List<_OrderWithClient>> _enrichOrders(List<Map<String, dynamic>> rows) async {
+    final out = <_OrderWithClient>[];
+    for (final row in rows) {
       try {
-        final servicesData = await Supabase.instance.client
+        final orderId = row['id'] as int;
+        final userId = row['user_id']?.toString();
+
+        final services = await Supabase.instance.client
             .from('order_services')
             .select()
-            .eq('order_id', orderJson['id']);
+            .eq('order_id', orderId);
+        row['order_services'] = services;
+        final order = Order.fromJson(row);
 
-        orderJson['order_services'] = servicesData;
-        orders.add(Order.fromJson(orderJson));
-      } catch (e) {
-        // Skip orders with errors
-        continue;
-      }
+        var clientName = 'Cliente';
+        if (userId != null) {
+          final profile = await Supabase.instance.client
+              .from('user_profiles')
+              .select('full_name')
+              .eq('id', userId)
+              .maybeSingle();
+          final n = profile?['full_name']?.toString().trim();
+          if (n != null && n.isNotEmpty) clientName = n;
+        }
+
+        out.add(_OrderWithClient(order: order, clientName: clientName));
+      } catch (_) {}
     }
-
-    return orders;
+    return out;
   }
 
-  Widget _buildOrderCard(BuildContext context, Order order) {
-    Color statusColor;
-    IconData statusIcon;
+  List<_OrderWithClient> _applyFilters(List<_OrderWithClient> source) {
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+    final monthAgo = DateTime(now.year, now.month - 1, now.day);
+    final q = _search.toLowerCase().trim();
 
-    switch (order.status) {
-      case 'completed':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'in_progress':
-        statusColor = Colors.blue;
-        statusIcon = Icons.hourglass_empty;
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.info;
-    }
+    return source.where((item) {
+      final date = item.order.createdAt;
+      final periodOk = _periodFilter == 'all' ||
+          (_periodFilter == 'week' && date.isAfter(weekAgo)) ||
+          (_periodFilter == 'month' && date.isAfter(monthAgo));
+      if (!periodOk) return false;
+      if (q.isEmpty) return true;
 
-    return GestureDetector(
-      onTap: () => _showOrderDetails(context, order),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: statusColor.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header con fecha y estado
-            Row(
-              children: [
-                Icon(statusIcon, color: statusColor, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.formattedDate,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        order.statusLabel,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  order.formattedTime,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 8),
-
-            // Servicios realizados
-            Row(
-              children: [
-                const Icon(Icons.spa, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    order.services.length == 1
-                        ? order.services.first.serviceName
-                        : '${order.services.length} servicios',
-                    style: const TextStyle(fontSize: 14),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Duración
-            if (order.actualDuration != null)
-              Row(
-                children: [
-                  const Icon(Icons.timer, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Duración real: ${order.actualDuration} min',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    order.formattedDuration,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: 8),
-
-            // Total
-            Row(
-              children: [
-                const Icon(Icons.attach_money, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                const Text(
-                  'Total: ',
-                  style: TextStyle(fontSize: 14),
-                ),
-                Text(
-                  order.formattedPrice,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff721c80),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+      final client = item.clientName.toLowerCase();
+      final services = item.order.services.map((s) => s.serviceName.toLowerCase()).join(' ');
+      return client.contains(q) || services.contains(q);
+    }).toList();
   }
 
-  void _showOrderDetails(BuildContext context, Order order) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.85,
-        builder: (_, controller) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.all(24),
+  Widget _buildFilters(int total) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      color: Colors.grey.shade100,
+      child: Column(
+        children: [
+          Row(
             children: [
-              // Indicador
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Header
-              Row(
-                children: [
-                  Text(
-                    order.statusEmoji,
-                    style: const TextStyle(fontSize: 32),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Orden #${order.id}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          order.statusLabel,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Información
-              _buildInfoRow(
-                icon: Icons.calendar_today,
-                label: 'Fecha',
-                value: order.formattedDate,
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                icon: Icons.access_time,
-                label: 'Hora programada',
-                value: order.formattedTime,
-              ),
-
-              if (order.startTime != null) ...[
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  icon: Icons.play_circle,
-                  label: 'Inicio real',
-                  value: _formatTime(order.startTime!),
-                ),
-              ],
-
-              if (order.endTime != null) ...[
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  icon: Icons.stop_circle,
-                  label: 'Finalización',
-                  value: _formatTime(order.endTime!),
-                ),
-              ],
-
-              if (order.actualDuration != null) ...[
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  icon: Icons.timer,
-                  label: 'Duración real',
-                  value: '${order.actualDuration} min',
-                ),
-              ],
-
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // Servicios
-              Row(
-                children: [
-                  const Icon(Icons.spa, color: Color(0xff721c80), size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Servicios Realizados (${order.services.length})',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...order.services.map((service) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 28),
-                        Expanded(
-                          child: Text(
-                            '• ${service.serviceName}',
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                        ),
-                        Text(
-                          service.formattedDuration,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // Total
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    order.formattedPrice,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xff721c80),
-                    ),
-                  ),
-                ],
-              ),
+              _periodChip('Todo', 'all'),
+              const SizedBox(width: 8),
+              _periodChip('Semana', 'week'),
+              const SizedBox(width: 8),
+              _periodChip('Mes', 'month'),
+              const Spacer(),
+              Text('$total', style: const TextStyle(fontWeight: FontWeight.w700)),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xff721c80), size: 20),
-          const SizedBox(width: 12),
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 10),
+          TextField(
+            controller: _searchController,
+            onChanged: (v) => setState(() => _search = v),
+            decoration: InputDecoration(
+              hintText: 'Filtra por cliente o servicio...',
+              prefixIcon: const Icon(Icons.search, color: Color(0xff721c80)),
+              suffixIcon: _search.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _search = '');
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
         ],
@@ -517,11 +182,368 @@ class EmployeeHistoryScreen extends ConsumerWidget {
     );
   }
 
-  String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
+  Widget _periodChip(String label, String value) {
+    final selected = _periodFilter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _periodFilter = value),
+      selectedColor: const Color(0xff721c80),
+      labelStyle: TextStyle(color: selected ? Colors.white : Colors.black87),
+    );
   }
+
+  Widget _buildOrderCard(_OrderWithClient item) {
+    final o = item.order;
+    final color = o.status == 'completed'
+        ? Colors.green
+        : o.status == 'in_progress'
+            ? Colors.blue
+            : o.status == 'cancelled'
+                ? Colors.red
+                : Colors.grey;
+
+    return InkWell(
+      onTap: () => _showDetail(item),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.clientName,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ),
+                Text(
+                  o.formattedTime,
+                  style: const TextStyle(color: Color(0xff721c80), fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('${o.formattedDate} - ${o.statusLabel}', style: TextStyle(color: Colors.grey.shade600)),
+            const SizedBox(height: 8),
+            Text(
+              o.services.map((s) => s.serviceName).take(2).join(', ') +
+                  (o.services.length > 2 ? ' +${o.services.length - 2}' : ''),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDetail(_OrderWithClient item) async {
+    final order = item.order;
+    final employeeId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    var services = List<OrderService>.from(order.services);
+    try {
+      final latestServices = await Supabase.instance.client
+          .from('order_services')
+          .select()
+          .eq('order_id', order.id);
+      services = latestServices
+          .map((s) => OrderService.fromJson(s as Map<String, dynamic>))
+          .toList();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final localStatus = <int, String>{for (final s in services) s.id: s.status};
+    final localEmployee = <int, String?>{for (final s in services) s.id: s.employeeId};
+
+    final selected = services
+        .where((s) => s.status == 'in_progress' && (s.employeeId == null || s.employeeId == employeeId))
+        .map((s) => s.id)
+        .toSet();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          String statusOf(OrderService s) => (localStatus[s.id] ?? s.status).toLowerCase();
+          String? employeeOf(OrderService s) => localEmployee[s.id] ?? s.employeeId;
+
+          final selectedServices = services.where((s) => selected.contains(s.id)).toList();
+          final selectedToStart = selectedServices
+              .where((s) => statusOf(s) != 'in_progress' && statusOf(s) != 'completed')
+              .toList();
+          final selectedToComplete = selectedServices.where((s) => statusOf(s) == 'in_progress').toList();
+
+          Future<void> runStart() async {
+            var started = 0;
+            for (final s in selectedToStart) {
+              final ok = await startOrderService(
+                orderId: order.id,
+                orderServiceId: s.id,
+                employeeId: employeeId,
+              );
+              if (ok) {
+                started++;
+                setModalState(() {
+                  localStatus[s.id] = 'in_progress';
+                  localEmployee[s.id] = employeeId;
+                  selected.add(s.id);
+                });
+              }
+            }
+            if (!mounted) return;
+            if (started == 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No se pudo iniciar los servicios seleccionados.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Servicios iniciados: $started'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+
+          Future<void> runComplete() async {
+            var completed = 0;
+            for (final s in selectedToComplete) {
+              final ok = await completeOrderService(
+                orderId: order.id,
+                orderServiceId: s.id,
+                employeeId: employeeId,
+              );
+              if (ok) {
+                completed++;
+                setModalState(() {
+                  localStatus[s.id] = 'completed';
+                  selected.remove(s.id);
+                });
+              }
+            }
+            if (!mounted) return;
+            if (completed == 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No se pudo completar los servicios seleccionados.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Servicios completados: $completed'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.74,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (_, controller) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Text(item.clientName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text('Orden #${order.id} - ${order.statusLabel}'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Iniciar: ${selectedToStart.length} • Completar: ${selectedToComplete.length}',
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...services.map((s) {
+                    final status = statusOf(s);
+                    final owner = employeeOf(s);
+                    final isSelected = selected.contains(s.id);
+                    final isCompleted = status == 'completed';
+                    final takenByAnother = status == 'in_progress' && owner != null && owner != employeeId;
+                    final isDisabled = isCompleted || takenByAnother;
+                    final statusText = isCompleted
+                        ? 'Completado'
+                        : status == 'in_progress'
+                            ? 'En progreso'
+                            : 'Pendiente';
+
+                    return InkWell(
+                      onTap: isDisabled
+                          ? null
+                          : () {
+                              setModalState(() {
+                                if (isSelected) {
+                                  selected.remove(s.id);
+                                } else {
+                                  selected.add(s.id);
+                                }
+                              });
+                            },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDisabled
+                              ? Colors.grey.shade100
+                              : isSelected
+                                  ? const Color(0xff721c80).withOpacity(0.08)
+                                  : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xff721c80) : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isCompleted
+                                  ? Icons.check_circle
+                                  : isSelected
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                              color: isCompleted
+                                  ? Colors.green
+                                  : isDisabled
+                                      ? Colors.grey.shade400
+                                      : isSelected
+                                          ? const Color(0xff721c80)
+                                          : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.serviceName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: isDisabled ? Colors.grey.shade600 : Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    takenByAnother
+                                        ? '${s.formattedDuration} - ${s.formattedPrice} - Tomado por otro empleado'
+                                        : '${s.formattedDuration} - ${s.formattedPrice} - $statusText',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 14),
+                  if (order.status == 'in_progress' || order.status == 'confirmed') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: selectedToStart.isEmpty ? null : runStart,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xff721c80),
+                              side: const BorderSide(color: Color(0xff721c80)),
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              selectedToStart.length <= 1
+                                  ? 'Iniciar'
+                                  : 'Iniciar (${selectedToStart.length})',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: selectedToComplete.isEmpty ? null : runComplete,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              selectedToComplete.length <= 1
+                                  ? 'Completar'
+                                  : 'Completar (${selectedToComplete.length})',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Los servicios completados quedan bloqueados.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OrderWithClient {
+  final Order order;
+  final String clientName;
+
+  const _OrderWithClient({
+    required this.order,
+    required this.clientName,
+  });
 }

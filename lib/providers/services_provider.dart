@@ -163,33 +163,36 @@ class Service {
 // ============================================
 
 /// Provider para obtener todas las categorías activas
-final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) async{
+final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) async {
   try {
-    // Simular retardo para demostración
-    await Future.delayed(const Duration(milliseconds: 500));
- 
-  final categories = await Supabase.instance.client
+    final categories = await Supabase.instance.client
         .from('service_categories')
         .select()
         .eq('is_active', true)
         .order('display_order');
-  List<ServiceCategory> categoriesWithCount = [];
-    for (var categoryJson in categories) {
-      final productsResponse = await Supabase.instance.client
-          .from('services')
-          .select()
-          .eq('category_id', categoryJson['id'])
-          .eq('is_active', true);
 
-      categoryJson['services_count'] = productsResponse.length;
+    final services = await Supabase.instance.client
+        .from('services')
+        .select('id, category_id')
+        .eq('is_active', true);
+
+    final countByCategory = <int, int>{};
+    for (final service in services) {
+      final categoryId = service['category_id'] as int?;
+      if (categoryId == null) continue;
+      countByCategory[categoryId] = (countByCategory[categoryId] ?? 0) + 1;
+    }
+
+    final categoriesWithCount = <ServiceCategory>[];
+    for (var categoryJson in categories) {
+      categoryJson['services_count'] = countByCategory[categoryJson['id']] ?? 0;
       categoriesWithCount.add(ServiceCategory.fromJson(categoryJson));
     }
-  return categoriesWithCount;
-}
-  catch (e) {
+
+    return categoriesWithCount;
+  } catch (e) {
     print(e);
     return [];
-    
   }
 });
 
@@ -263,6 +266,84 @@ final formattedDurationProvider = Provider<String>((ref) {
   return '$hours h ${minutes}min';
 });
 
+/// Foto principal por servicio (toma la primera por uploaded_at/id)
+final servicePrimaryPhotosProvider = FutureProvider<Map<int, String>>((ref) async {
+  try {
+    final rows = await Supabase.instance.client
+        .from('services_photos')
+        .select('service_id, photo_url, uploaded_at, id')
+        .order('service_id')
+        .order('uploaded_at')
+        .order('id');
+
+    final photoByService = <int, String>{};
+    for (final row in rows as List) {
+      final serviceId = row['service_id'] as int?;
+      final photoUrl = row['photo_url'] as String?;
+      if (serviceId == null || photoUrl == null || photoUrl.trim().isEmpty) {
+        continue;
+      }
+      photoByService.putIfAbsent(serviceId, () => photoUrl);
+    }
+    return photoByService;
+  } catch (_) {
+    return {};
+  }
+});
+
+// ============================================
+// CRUD DE SERVICIOS
+// ============================================
+
+Future<int> createService({
+  required String name,
+  int? categoryId,
+  String? description,
+  required double price,
+  required int durationMinutes,
+  bool isActive = true,
+}) async {
+  final response = await Supabase.instance.client
+      .from('services')
+      .insert({
+        'name': name,
+        'category_id': categoryId,
+        'description': description,
+        'price': price,
+        'duration_minutes': durationMinutes,
+        'is_active': isActive,
+      })
+      .select('id')
+      .single();
+
+  return response['id'] as int;
+}
+
+Future<void> updateService({
+  required int serviceId,
+  String? name,
+  required int? categoryId,
+  String? description,
+  double? price,
+  int? durationMinutes,
+  bool? isActive,
+}) async {
+  final updates = <String, dynamic>{};
+
+  if (name != null) updates['name'] = name;
+  updates['category_id'] = categoryId;
+  if (description != null) updates['description'] = description;
+  if (price != null) updates['price'] = price;
+  if (durationMinutes != null) updates['duration_minutes'] = durationMinutes;
+  if (isActive != null) updates['is_active'] = isActive;
+
+  await Supabase.instance.client.from('services').update(updates).eq('id', serviceId);
+}
+
+Future<void> deleteService(int serviceId) async {
+  await Supabase.instance.client.from('services').delete().eq('id', serviceId);
+}
+
 // ============================================
 // MÉTODOS HELPER
 // ============================================
@@ -294,150 +375,3 @@ void clearSelectedServices(WidgetRef ref) {
   ref.read(selectedCategoryProvider.notifier).state = null;
 }
 
-/// Provider para obtener un servicio específico por ID (con fotos)
-final serviceByIdProvider = FutureProvider.family<Service?, int>((ref, serviceId) async {
-  try {
-    final response = await Supabase.instance.client
-        .from('services')
-        .select('''
-          *,
-          service_categories(name)
-        ''')
-        .eq('id', serviceId)
-        .single();
-
-    // Obtener fotos del servicio
-    final photos = await Supabase.instance.client
-        .from('services_photos')
-        .select()
-        .eq('service_id', serviceId)
-        .order('uploaded_at');
-
-    // Agregar nombre de categoría si existe
-    if (response['service_categories'] != null) {
-      response['category_name'] = response['service_categories']['name'];
-    }
-    response['photos'] = photos;
-
-    return Service.fromJson(response);
-  } catch (e) {
-    print('Error fetching service by ID: $e');
-    return null;
-  }
-});
-
-// ============================================
-// MÉTODOS CRUD
-// ============================================
-
-/// Crear un nuevo servicio
-Future<Service?> createService({
-  required String name,
-  required double price,
-  required int durationMinutes,
-  required int categoryId,
-  String? description,
-}) async {
-  try {
-    final response = await Supabase.instance.client
-        .from('services')
-        .insert({
-          'name': name,
-          'price': price,
-          'duration_minutes': durationMinutes,
-          'category_id': categoryId,
-          'description': description,
-          'is_active': true,
-        })
-        .select()
-        .single();
-
-    return Service.fromJson(response);
-  } catch (e) {
-    print('Error creating service: $e');
-    return null;
-  }
-}
-
-/// Actualizar un servicio existente
-Future<bool> updateService({
-  required int serviceId,
-  String? name,
-  double? price,
-  int? durationMinutes,
-  int? categoryId,
-  String? description,
-  bool? isActive,
-}) async {
-  try {
-    final Map<String, dynamic> updates = {};
-
-    if (name != null) updates['name'] = name;
-    if (price != null) updates['price'] = price;
-    if (durationMinutes != null) updates['duration_minutes'] = durationMinutes;
-    if (categoryId != null) updates['category_id'] = categoryId;
-    if (description != null) updates['description'] = description;
-    if (isActive != null) updates['is_active'] = isActive;
-
-    if (updates.isEmpty) return false;
-
-    await Supabase.instance.client
-        .from('services')
-        .update(updates)
-        .eq('id', serviceId);
-
-    return true;
-  } catch (e) {
-    print('Error updating service: $e');
-    return false;
-  }
-}
-
-/// Agregar una foto a un servicio
-Future<bool> addServicePhoto({
-  required int serviceId,
-  required String photoUrl,
-  String? caption,
-}) async {
-  try {
-    await Supabase.instance.client.from('services_photos').insert({
-      'service_id': serviceId,
-      'photo_url': photoUrl,
-      'caption': caption,
-    });
-    return true;
-  } catch (e) {
-    print('Error adding service photo: $e');
-    return false;
-  }
-}
-
-/// Eliminar una foto de un servicio
-Future<bool> deleteServicePhoto(int photoId) async {
-  try {
-    await Supabase.instance.client
-        .from('services_photos')
-        .delete()
-        .eq('id', photoId);
-
-    return true;
-  } catch (e) {
-    print('Error deleting service photo: $e');
-    return false;
-  }
-}
-
-/// Eliminar un servicio
-Future<bool> deleteService(int serviceId) async {
-  try {
-    await Supabase.instance.client
-        .from('services')
-        .delete()
-        .eq('id', serviceId);
-
-    return true;
-  } catch (e) {
-    print('Error deleting service: $e');
-    return false;
-  }
-}

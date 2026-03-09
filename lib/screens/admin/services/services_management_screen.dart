@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
 import 'package:lorensbeauty/providers/services_provider.dart';
-import 'service_form_screen.dart';
+import 'package:lorensbeauty/screens/admin/services/service_form_screen.dart';
 
 class ServicesManagementScreen extends ConsumerStatefulWidget {
   const ServicesManagementScreen({Key? key}) : super(key: key);
@@ -15,77 +15,163 @@ class ServicesManagementScreen extends ConsumerStatefulWidget {
 class _ServicesManagementScreenState
     extends ConsumerState<ServicesManagementScreen> {
   int? _selectedCategoryId;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final servicesAsync = ref.watch(allServicesProvider);
     final categoriesAsync = ref.watch(serviceCategoriesProvider);
+    final servicePhotosAsync = ref.watch(servicePrimaryPhotosProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestión de Servicios'),
+        title: const Text('Gestion de Servicios'),
         backgroundColor: const Color(0xff721c80),
         foregroundColor: Colors.white,
       ),
-      body: Column(
-        children: [
-          // Filtro de categorías
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: categoriesAsync.when(
-              data: (categories) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      FilterChip(
-                        label: const Text('Todos'),
-                        checkmarkColor: Colors.white,
-                        selected: _selectedCategoryId == null,
-                        onSelected: (selected) {
-                          setState(() => _selectedCategoryId = null);
-                        },
-                        selectedColor: const Color(0xff721c80),
-                        labelStyle: TextStyle(
-                          color: _selectedCategoryId == null
-                              ? Colors.white
-                              : Colors.black,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ...categories.map((category) {
-                        final isSelected = _selectedCategoryId == category.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text('${category.name} (${category.servicesCount})'),
-                            selected: isSelected,
-                            checkmarkColor: Colors.white,
-                            onSelected: (selected) {
-                              setState(() {
-                                _selectedCategoryId = selected ? category.id : null;
-                              });
-                            },
-                            selectedColor: const Color(0xff721c80),
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black,
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Text('Error al cargar categorías'),
-            ),
-          ),
+      body: servicesAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(0xff721c80)),
+        ),
+        error: (error, _) => Center(child: Text('Error: ${error.toString()}')),
+        data: (services) {
+          final categories = categoriesAsync.maybeWhen(
+            data: (list) => list,
+            orElse: () => <ServiceCategory>[],
+          );
+          final categoryNameById = {
+            for (final c in categories) c.id: c.name,
+          };
+          final filtered = _filterServices(services, categoryNameById);
 
-          // Lista de servicios
-          Expanded(
-            child: _buildServicesList(),
-          ),
-        ],
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.grey[100],
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<int?>(
+                      value: _selectedCategoryId,
+                      decoration: InputDecoration(
+                        labelText: 'Filtrar por categoria',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: Colors.grey.shade400),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(14)),
+                          borderSide:
+                              BorderSide(color: Color(0xff721c80), width: 1.4),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text('Todas las categorias (${services.length})'),
+                        ),
+                        ...categories.map(
+                          (cat) => DropdownMenuItem(
+                            value: cat.id,
+                            child: Text('${cat.name} (${cat.serviceCount})'),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _selectedCategoryId = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          prefixIcon:
+                              const Icon(Icons.search, color: Color(0xff721c80)),
+                          hintText: 'Buscar servicio...',
+                          hintStyle: TextStyle(color: Colors.grey.shade500),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 20),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setState(() => _searchQuery = value.trim().toLowerCase());
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(child: Text('No se encontraron servicios'))
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = constraints.maxWidth > 900
+                              ? 4
+                              : constraints.maxWidth > 600
+                                  ? 3
+                                  : 2;
+
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: filtered.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 0.82,
+                            ),
+                            itemBuilder: (context, index) => _buildServiceCard(
+                              filtered[index],
+                              categoryNameById,
+                              servicePhotosAsync.maybeWhen(
+                                data: (map) => map[filtered[index].id],
+                                orElse: () => null,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _navigateToServiceForm(null),
@@ -97,204 +183,182 @@ class _ServicesManagementScreenState
     );
   }
 
-  Widget _buildServicesList() {
-    // Obtener TODOS los servicios una sola vez
-    final servicesAsync = ref.watch(allServicesProvider);
-
-    return servicesAsync.when(
-      data: (allServices) {
-        // Filtrar localmente según la categoría seleccionada
-        final filteredServices = _selectedCategoryId == null
-            ? allServices
-            : allServices
-                .where((service) => service.categoryId == _selectedCategoryId)
-                .toList();
-
-        if (filteredServices.isEmpty) {
-          return Center(
-            child: Text(
-              _selectedCategoryId == null
-                  ? 'No hay servicios registrados'
-                  : 'No hay servicios en esta categoría',
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: filteredServices.length,
-          addAutomaticKeepAlives: true,
-          cacheExtent: 500,
-          itemBuilder: (context, index) {
-            return _buildServiceCard(filteredServices[index]);
-          },
-        );
-      },
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xff721c80)),
-      ),
-      error: (error, _) => Center(
-        child: Text('Error: ${error.toString()}'),
-      ),
-    );
+  List<Service> _filterServices(
+    List<Service> services,
+    Map<int, String> categoryNameById,
+  ) {
+    return services.where((s) {
+      final matchesCategory =
+          _selectedCategoryId == null || s.categoryId == _selectedCategoryId;
+      final categoryText = s.categoryId == null
+          ? ''
+          : (categoryNameById[s.categoryId!] ?? '').toLowerCase();
+      final matchesSearch = _searchQuery.isEmpty ||
+          s.name.toLowerCase().contains(_searchQuery) ||
+          categoryText.contains(_searchQuery);
+      return matchesCategory && matchesSearch;
+    }).toList();
   }
 
-  Widget _buildServiceCard(Service service) {
+  Widget _buildServiceCard(
+    Service service,
+    Map<int, String> categoryNameById,
+    String? primaryPhotoUrl,
+  ) {
+    final categoryName = service.categoryId == null
+        ? 'Sin categoria'
+        : (categoryNameById[service.categoryId!] ?? 'Categoria ${service.categoryId}');
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: service.hasPhotos
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: service.firstPhotoUrl,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  fadeInDuration: const Duration(milliseconds: 200),
-                  fadeOutDuration: const Duration(milliseconds: 200),
-                  memCacheWidth: 120,
-                  memCacheHeight: 120,
-                  maxWidthDiskCache: 120,
-                  maxHeightDiskCache: 120,
-                  placeholder: (context, url) => Container(
-                    width: 60,
-                    height: 60,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xff721c80),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SizedBox(
+              width: double.infinity,
+              child: ((primaryPhotoUrl != null && primaryPhotoUrl.isNotEmpty) ||
+                      (service.img != null && service.img!.isNotEmpty))
+                  ? Image.network(
+                      primaryPhotoUrl ?? service.img!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image_not_supported),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.spa, size: 32),
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        service.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    width: 60,
-                    height: 60,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.image_not_supported),
+                    PopupMenuButton(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, color: Color(0xff721c80)),
+                              SizedBox(width: 8),
+                              Text('Editar'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'toggle_active',
+                          child: Row(
+                            children: [
+                              Icon(
+                                service.isActive
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(service.isActive ? 'Desactivar' : 'Activar'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Eliminar'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'edit':
+                            _navigateToServiceForm(service);
+                            break;
+                          case 'toggle_active':
+                            await _toggleServiceActive(service);
+                            break;
+                          case 'delete':
+                            _confirmDeleteService(service);
+                            break;
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                Text(
+                  service.formattedPrice,
+                  style: const TextStyle(
+                    color: Color(0xff721c80),
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              )
-            : Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(8),
+                Text(
+                  service.formattedDuration,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-                child: const Icon(Icons.spa),
-              ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                service.name,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+                Text(
+                  'Categoria: $categoryName',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                if (!service.isActive)
+                  const Icon(Icons.visibility_off, color: Colors.grey, size: 16),
+              ],
             ),
-            if (!service.isActive)
-              const Icon(Icons.visibility_off, color: Colors.grey, size: 20),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(service.formattedPrice,
-                style: const TextStyle(
-                    color: Color(0xff721c80), fontWeight: FontWeight.bold)),
-            Text(service.formattedDuration,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            // Mostrar categoría solo cuando NO hay filtro activo
-            if (_selectedCategoryId == null && service.categoryName != null)
-              Text('Categoría: ${service.categoryName}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          ],
-        ),
-        trailing: PopupMenuButton(
-          icon: const Icon(Icons.more_vert),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, color: Color(0xff721c80)),
-                  SizedBox(width: 8),
-                  Text('Editar'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Eliminar'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'toggle_active',
-              child: Row(
-                children: [
-                  Icon(
-                    service.isActive ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(service.isActive ? 'Desactivar' : 'Activar'),
-                ],
-              ),
-            ),
-          ],
-          onSelected: (value) async {
-            switch (value) {
-              case 'edit':
-                _navigateToServiceForm(service);
-                break;
-              case 'delete':
-                _confirmDelete(service);
-                break;
-              case 'toggle_active':
-                await updateService(
-                  serviceId: service.id,
-                  isActive: !service.isActive,
-                );
-                _refreshServices();
-                break;
-            }
-          },
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  void _navigateToServiceForm(Service? service) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ServiceFormScreen(service: service),
-      ),
+  Future<void> _toggleServiceActive(Service service) async {
+    await updateService(
+      serviceId: service.id,
+      categoryId: service.categoryId,
+      isActive: !service.isActive,
     );
 
-    if (result == true) {
-      _refreshServices();
-    }
-  }
-
-  void _refreshServices() {
-    // Solo invalidamos allServicesProvider ya que ahora filtramos localmente
     ref.invalidate(allServicesProvider);
     ref.invalidate(serviceCategoriesProvider);
   }
 
-  void _confirmDelete(Service service) {
+  Future<void> _navigateToServiceForm(Service? service) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ServiceFormScreen(service: service)),
+    );
+    if (result == true) {
+      ref.invalidate(allServicesProvider);
+      ref.invalidate(serviceCategoriesProvider);
+    }
+  }
+
+  void _confirmDeleteService(Service service) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmar eliminación'),
-        content: Text('¿Estás seguro de eliminar el servicio "${service.name}"?'),
+        title: const Text('Confirmar eliminacion'),
+        content: Text('Estas seguro de eliminar el servicio "${service.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -311,10 +375,14 @@ class _ServicesManagementScreenState
                     backgroundColor: Colors.green,
                   ),
                 );
-                _refreshServices();
+                ref.invalidate(allServicesProvider);
+                ref.invalidate(serviceCategoriesProvider);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Eliminar'),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/orders_provider.dart';
 
 class EmployeeOrdersScreen extends ConsumerStatefulWidget {
@@ -12,6 +13,33 @@ class EmployeeOrdersScreen extends ConsumerStatefulWidget {
 
 class _EmployeeOrdersScreenState extends ConsumerState<EmployeeOrdersScreen> {
   String _selectedFilter = 'all';
+
+  Future<bool> _completeMyInProgressServices(Order order) async {
+    final employeeId = Supabase.instance.client.auth.currentUser?.id;
+    if (employeeId == null) return false;
+
+    final candidates = order.services
+        .where(
+          (s) =>
+              s.status == 'in_progress' &&
+              (s.employeeId == null || s.employeeId == employeeId),
+        )
+        .toList();
+
+    if (candidates.isEmpty) return false;
+
+    var successCount = 0;
+    for (final service in candidates) {
+      final ok = await completeOrderService(
+        orderId: order.id,
+        orderServiceId: service.id,
+        employeeId: employeeId,
+      );
+      if (ok) successCount++;
+    }
+
+    return successCount > 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -574,13 +602,22 @@ class _EmployeeOrdersScreenState extends ConsumerState<EmployeeOrdersScreen> {
                     );
 
                     if (confirm == true && mounted) {
-                      final success = await completeOrder(order.id);
+                      final success = await _completeMyInProgressServices(order);
                       if (success && mounted) {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Servicio completado'),
+                            content: Text('Servicios actualizados'),
                             backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No se pudo completar. Verifica servicios en progreso asignados a este empleado.',
+                            ),
+                            backgroundColor: Colors.red,
                           ),
                         );
                       }

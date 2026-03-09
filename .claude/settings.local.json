@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(node --version)",
+      "Bash(npx --version)",
+      "mcp__supabase__list_tables"
+    ]
+  }
+}
