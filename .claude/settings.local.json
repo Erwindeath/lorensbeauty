@@ -5,7 +5,15 @@
       "WebFetch(domain:github.com)",
       "Bash(node --version)",
       "Bash(npx --version)",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "Bash(fvm flutter:*)",
+      "Bash(~/.fvm/bin/fvm flutter:*)",
+      "Bash(/opt/homebrew/bin/fvm flutter:*)",
+      "Bash(fvm --version)",
+      "Bash(pod --version)",
+      "Bash(xcodebuild -version)",
+      "Read(//private/tmp/**)",
+      "WebSearch"
     ]
   }
 }

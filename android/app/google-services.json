@@ -53,6 +53,13 @@
             {
               "client_id": "584858366771-b48rilig9dmnvu6qtpj26ti1hpbisjrk.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "584858366771-oggekffpntcc2340n14qkeg00pov0gh1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lorensbeauty"
+              }
             }
           ]
         }

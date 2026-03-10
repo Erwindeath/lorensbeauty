@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lorensbeauty/components/colors.dart';
+import 'package:lorensbeauty/firebase_options.dart';
 import 'package:lorensbeauty/provider/user_provider.dart';
 import 'package:lorensbeauty/screens/introduction/spalsh_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,7 +31,9 @@ Future<void> main() async {
     ),
   );
 
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 

@@ -85,7 +85,7 @@ class _ServicesManagementScreenState
                         ...categories.map(
                           (cat) => DropdownMenuItem(
                             value: cat.id,
-                            child: Text('${cat.name} (${cat.serviceCount})'),
+                            child: Text('${cat.name} (${cat.servicesCount})'),
                           ),
                         ),
                       ],

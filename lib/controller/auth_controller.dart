@@ -8,8 +8,9 @@ class Authentication {
   static Future<User?> signInWithGoogle({required BuildContext context}) async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '584858366771-b48rilig9dmnvu6qtpj26ti1hpbisjrk.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
-        signInOption: SignInOption.standard, // Fuerza selector de cuentas
+        signInOption: SignInOption.standard,
         forceCodeForRefreshToken: true,
       );
       print("*********************************************");

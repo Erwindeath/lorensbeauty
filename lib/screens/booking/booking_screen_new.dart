@@ -265,7 +265,7 @@ class _BookingScreenNewState extends ConsumerState<BookingScreenNew> {
                 ...categories.map(
                   (cat) => DropdownMenuItem<int?>(
                     value: cat.id,
-                    child: Text('${cat.name} (${cat.serviceCount})'),
+                    child: Text('${cat.name} (${cat.servicesCount})'),
                   ),
                 ),
               ],
